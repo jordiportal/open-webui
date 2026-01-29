@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fade, slide } from 'svelte/transition';
-	import { createEventDispatcher, getContext, onMount } from 'svelte';
+	import { createEventDispatcher, getContext, onMount, tick } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
 	import { copyToClipboard } from '$lib/utils';
@@ -104,27 +104,35 @@
 </html>`;
 	}
 
+	let mounted = false;
+
 	onMount(() => {
+		mounted = true;
 		if (content) {
 			slidesParsed = parseSlides(content);
 			totalSlides = slidesParsed.length;
-			updateIframe();
+			// Use tick to ensure iframe is bound
+			tick().then(() => updateIframe());
 		}
 	});
 
-	$: if (content) {
+	$: if (content && mounted) {
 		slidesParsed = parseSlides(content);
 		totalSlides = slidesParsed.length;
 		if (currentSlide >= totalSlides) {
 			currentSlide = Math.max(0, totalSlides - 1);
 		}
-		updateIframe();
+		// Use tick to ensure DOM is ready
+		tick().then(() => updateIframe());
 	}
 
 	function updateIframe() {
 		if (iframeElement && slidesParsed.length > 0) {
 			const slideHTML = generateSlideHTML(slidesParsed[currentSlide] || '');
+			console.log('Updating iframe with slide', currentSlide, 'content length:', slideHTML.length);
 			iframeElement.srcdoc = slideHTML;
+		} else {
+			console.log('Cannot update iframe:', { hasElement: !!iframeElement, slidesCount: slidesParsed.length });
 		}
 	}
 
