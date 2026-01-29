@@ -1,0 +1,166 @@
+/**
+ * Brain Event Parser
+ * 
+ * Utilities for parsing Brain events embedded in streaming responses.
+ * Brain events are embedded as HTML comments: <!--BRAIN_EVENT:{...}-->
+ */
+
+export interface BrainEvent {
+	type: 'thinking' | 'action' | 'sources' | 'outline' | 'artifact' | 'text' | 'console' | 'error';
+	content?: string;
+	artifact_type?: 'slides' | 'code' | 'html' | 'svg' | 'document';
+	format?: string;
+	title?: string;
+	action?: string;
+	status?: 'start' | 'progress' | 'complete' | 'error';
+	sources?: Array<{ title: string; url: string; snippet?: string }>;
+	items?: string[];
+	language?: string;
+	output?: string;
+	error?: string;
+}
+
+export interface ParsedContent {
+	text: string;
+	events: BrainEvent[];
+}
+
+const BRAIN_EVENT_REGEX = /<!--BRAIN_EVENT:(.*?)-->/gs;
+
+/**
+ * Parse Brain events from streaming content
+ * Returns both the clean text and extracted events
+ */
+export function parseBrainEvents(content: string): ParsedContent {
+	const events: BrainEvent[] = [];
+	let text = content;
+
+	// Extract all Brain events
+	let match;
+	while ((match = BRAIN_EVENT_REGEX.exec(content)) !== null) {
+		try {
+			const eventData = JSON.parse(match[1]);
+			events.push(eventData);
+		} catch (e) {
+			console.warn('Failed to parse Brain event:', match[1], e);
+		}
+	}
+
+	// Remove Brain event markers from text
+	text = content.replace(BRAIN_EVENT_REGEX, '').trim();
+
+	return { text, events };
+}
+
+/**
+ * Check if content contains Brain events
+ */
+export function hasBrainEvents(content: string): boolean {
+	return BRAIN_EVENT_REGEX.test(content);
+}
+
+/**
+ * Extract specific event types from parsed events
+ */
+export function getEventsByType<T extends BrainEvent['type']>(
+	events: BrainEvent[],
+	type: T
+): BrainEvent[] {
+	return events.filter((e) => e.type === type);
+}
+
+/**
+ * Get the latest thinking event (may be streaming)
+ */
+export function getLatestThinking(events: BrainEvent[]): BrainEvent | null {
+	const thinkingEvents = getEventsByType(events, 'thinking');
+	return thinkingEvents.length > 0 ? thinkingEvents[thinkingEvents.length - 1] : null;
+}
+
+/**
+ * Get all action events
+ */
+export function getActions(events: BrainEvent[]): BrainEvent[] {
+	return getEventsByType(events, 'action');
+}
+
+/**
+ * Get the latest artifact event
+ */
+export function getLatestArtifact(events: BrainEvent[]): BrainEvent | null {
+	const artifactEvents = getEventsByType(events, 'artifact');
+	return artifactEvents.length > 0 ? artifactEvents[artifactEvents.length - 1] : null;
+}
+
+/**
+ * Get all source events
+ */
+export function getSources(events: BrainEvent[]): BrainEvent[] {
+	return getEventsByType(events, 'sources');
+}
+
+/**
+ * Get all console events
+ */
+export function getConsoleEvents(events: BrainEvent[]): BrainEvent[] {
+	return getEventsByType(events, 'console');
+}
+
+/**
+ * Check if Brain model is being used
+ */
+export function isBrainModel(modelId: string): boolean {
+	return modelId?.toLowerCase().startsWith('brain-') || modelId?.toLowerCase().includes('brain');
+}
+
+/**
+ * Accumulate Brain events from streaming chunks
+ * Useful for building up state during streaming
+ */
+export class BrainEventAccumulator {
+	private events: BrainEvent[] = [];
+	private currentThinking: string = '';
+	private currentArtifact: BrainEvent | null = null;
+
+	addEvent(event: BrainEvent): void {
+		this.events.push(event);
+
+		if (event.type === 'thinking') {
+			if (event.status === 'start') {
+				this.currentThinking = '';
+			} else if (event.content) {
+				this.currentThinking += event.content;
+			}
+		}
+
+		if (event.type === 'artifact') {
+			this.currentArtifact = event;
+		}
+	}
+
+	getEvents(): BrainEvent[] {
+		return this.events;
+	}
+
+	getCurrentThinking(): string {
+		return this.currentThinking;
+	}
+
+	getCurrentArtifact(): BrainEvent | null {
+		return this.currentArtifact;
+	}
+
+	getActions(): BrainEvent[] {
+		return getActions(this.events);
+	}
+
+	getSources(): BrainEvent[] {
+		return getSources(this.events);
+	}
+
+	reset(): void {
+		this.events = [];
+		this.currentThinking = '';
+		this.currentArtifact = null;
+	}
+}

@@ -14,6 +14,10 @@
 	} from '$lib/stores';
 	import FloatingButtons from '../ContentRenderer/FloatingButtons.svelte';
 	import { createMessagesList } from '$lib/utils';
+	import { parseBrainEvents, isBrainModel } from '$lib/utils/brain';
+	import ThinkingBlock from './Brain/ThinkingBlock.svelte';
+	import ActionBlock from './Brain/ActionBlock.svelte';
+	import SourcesBlock from './Brain/SourcesBlock.svelte';
 
 	export let id;
 	export let content;
@@ -41,6 +45,62 @@
 
 	let contentContainerElement;
 	let floatingButtonsElement;
+
+	// Brain event parsing
+	let brainParsed = { text: '', events: [] };
+	let brainThinking = '';
+	let brainThinkingStatus = 'progress';
+	let brainActions = [];
+	let brainSources = [];
+
+	// Determine if this is a Brain model response
+	$: isBrain = model?.id ? isBrainModel(model.id) : false;
+
+	// Parse Brain events from content
+	$: if (content && isBrain) {
+		brainParsed = parseBrainEvents(content);
+		processBrainEvents(brainParsed.events);
+	} else {
+		brainParsed = { text: content || '', events: [] };
+	}
+
+	// Update thinking status when done
+	$: if (done && brainThinking) {
+		brainThinkingStatus = 'complete';
+	}
+
+	function processBrainEvents(events) {
+		let newThinking = '';
+		brainActions = [];
+		brainSources = [];
+
+		for (const event of events) {
+			switch (event.type) {
+				case 'thinking':
+					if (event.status === 'start') {
+						newThinking = '';
+						brainThinkingStatus = 'progress';
+					} else if (event.status === 'complete') {
+						brainThinkingStatus = 'complete';
+					} else if (event.status === 'error') {
+						brainThinkingStatus = 'error';
+					} else if (event.content) {
+						newThinking += event.content;
+					}
+					break;
+				case 'action':
+					brainActions = [...brainActions, event];
+					break;
+				case 'sources':
+					brainSources = [...brainSources, event];
+					break;
+			}
+		}
+		brainThinking = newThinking;
+	}
+
+	// Get clean content for Markdown (without Brain event markers)
+	$: cleanContent = isBrain ? brainParsed.text : content;
 
 	const updateButtonPosition = (event) => {
 		const buttonsContainerElement = document.getElementById(`floating-buttons-${id}`);
@@ -133,9 +193,41 @@
 </script>
 
 <div bind:this={contentContainerElement}>
+	<!-- Brain Events (Thinking, Actions, Sources) -->
+	{#if isBrain}
+		{#if brainThinking}
+			<ThinkingBlock
+				content={brainThinking}
+				status={brainThinkingStatus}
+				collapsed={done}
+			/>
+		{/if}
+
+		{#if brainActions.length > 0}
+			<div class="brain-actions space-y-1 my-2">
+				{#each brainActions as action}
+					<ActionBlock
+						action={action.action || ''}
+						status={action.status || 'complete'}
+						description={action.content || ''}
+					/>
+				{/each}
+			</div>
+		{/if}
+
+		{#if brainSources.length > 0}
+			{#each brainSources as sourceEvent}
+				{#if sourceEvent.sources && sourceEvent.sources.length > 0}
+					<SourcesBlock sources={sourceEvent.sources} />
+				{/if}
+			{/each}
+		{/if}
+	{/if}
+
+	<!-- Main Content (Markdown) -->
 	<Markdown
 		{id}
-		{content}
+		content={cleanContent}
 		{model}
 		{save}
 		{preview}
