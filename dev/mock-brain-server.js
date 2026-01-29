@@ -150,42 +150,49 @@ function generateChatEvents(prompt) {
 }
 
 function generateSlidesEvents(prompt) {
-  return [
-    { type: 'thinking', content: `El usuario quiere una presentación. Analizando requisitos:\n\n1. Tema: ${prompt}\n2. Idioma: Español\n3. Estimando 8-10 slides`, delay: 800 },
+  // Generate slides dynamically, one at a time
+  const events = [
+    { type: 'thinking', content: `El usuario quiere una presentación. Analizando requisitos:\n\n1. Tema: ${prompt}\n2. Idioma: Español\n3. Estimando 5 slides`, delay: 600 },
     
-    { type: 'action', action_type: 'search', title: 'Investigando el tema', status: 'running', delay: 300 },
-    { type: 'action', action_type: 'search', title: 'Investigando el tema', status: 'completed', results_count: 23, delay: 1500 },
+    { type: 'action', action_type: 'search', title: 'Investigando el tema', status: 'running', delay: 200 },
+    { type: 'action', action_type: 'search', title: 'Investigando el tema', status: 'completed', results_count: 23, delay: 1000 },
     
     { type: 'sources', sources: [
-      { url: 'https://wikipedia.org/wiki/Tema', title: 'Wikipedia - Información general', snippet: 'Artículo completo sobre el tema...', favicon: '🌐' },
-      { url: 'https://medium.com/articulo', title: 'Medium - Análisis profundo', snippet: 'Un análisis detallado de...', favicon: '📝' },
-      { url: 'https://research.com/paper', title: 'Paper académico', snippet: 'Investigación científica sobre...', favicon: '📊' },
-    ], delay: 500 },
+      { url: 'https://wikipedia.org/wiki/AI', title: 'Wikipedia - Inteligencia Artificial', snippet: 'La inteligencia artificial es...', favicon: '🌐' },
+      { url: 'https://openai.com/research', title: 'OpenAI Research', snippet: 'Últimos avances en IA...', favicon: '🤖' },
+      { url: 'https://arxiv.org/ai', title: 'Papers de IA', snippet: 'Investigaciones recientes...', favicon: '📊' },
+    ], delay: 400 },
     
-    { type: 'action', action_type: 'file_create', title: 'Generando estructura de slides', status: 'running', delay: 300 },
+    { type: 'action', action_type: 'slides', title: 'Generando presentación', status: 'running', delay: 200 },
     
-    { type: 'outline', title: 'Estructura de la Presentación', items: [
-      { id: '1', number: 1, title: 'Introducción', description: 'Contexto y objetivos', tag: 'Cover' },
-      { id: '2', number: 2, title: 'Contenido', description: 'Agenda de la presentación', tag: 'Agenda' },
-      { id: '3', number: 3, title: 'Punto Principal 1', description: 'Desarrollo del primer tema' },
-      { id: '4', number: 4, title: 'Punto Principal 2', description: 'Desarrollo del segundo tema' },
-      { id: '5', number: 5, title: 'Datos y Estadísticas', description: 'Evidencia y métricas', tag: 'Data' },
-      { id: '6', number: 6, title: 'Conclusiones', description: 'Resumen y próximos pasos', tag: 'Final' },
-    ], delay: 1000 },
-    
-    { type: 'action', action_type: 'file_create', title: 'Generando estructura de slides', status: 'completed', delay: 500 },
-    
-    { type: 'text', content: '\n\n✅ **Presentación generada exitosamente**\n\n', delay: 300 },
-    { type: 'text', content: 'He creado una presentación con **6 diapositivas** que incluye:\n', delay: 200 },
-    { type: 'text', content: '- Portada con título e introducción\n', delay: 100 },
-    { type: 'text', content: '- Agenda con los puntos a tratar\n', delay: 100 },
-    { type: 'text', content: '- Contenido principal desarrollado\n', delay: 100 },
-    { type: 'text', content: '- Datos y estadísticas relevantes\n', delay: 100 },
-    { type: 'text', content: '- Conclusiones y recomendaciones\n\n', delay: 100 },
-    { type: 'text', content: 'Puedes ver la presentación en el panel lateral →', delay: 200 },
-    
-    { type: 'artifact', artifact_type: 'slides', title: 'Presentación Generada', content: MOCK_SLIDES_HTML, format: 'html', downloadable: true, delay: 500 },
+    { type: 'text', content: '\n\n🎨 **Generando presentación...**\n\n', delay: 200 },
   ];
+
+  // Add each slide progressively
+  const slideContents = SLIDES_ARRAY;
+  let accumulatedHTML = getSlideStyles();
+  
+  slideContents.forEach((slide, index) => {
+    accumulatedHTML += slide;
+    events.push({
+      type: 'text',
+      content: `📄 Slide ${index + 1} generada...\n`,
+      delay: 300
+    });
+    events.push({
+      type: 'artifact',
+      artifact_type: 'slides',
+      title: 'Presentación: ' + prompt.substring(0, 30),
+      content: accumulatedHTML,
+      format: 'html',
+      delay: 800
+    });
+  });
+
+  events.push({ type: 'action', action_type: 'slides', title: 'Generando presentación', status: 'completed', delay: 300 });
+  events.push({ type: 'text', content: '\n✅ **Presentación completada** - 5 slides generadas\n', delay: 200 });
+
+  return events;
 }
 
 function generateResearchEvents(prompt) {
@@ -245,236 +252,111 @@ function generateCodeEvents(prompt) {
 }
 
 // ============================================
-// Mock HTML Content
+// Mock HTML Content - Slides as Array for Progressive Loading
 // ============================================
 
-const MOCK_SLIDES_HTML = `
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <style>
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { 
-      font-family: 'Segoe UI', system-ui, sans-serif; 
-      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-      color: #e4e4e7;
-    }
-    .slide { 
-      min-height: 100vh; 
-      display: flex; 
-      flex-direction: column; 
-      justify-content: center;
-      padding: 80px;
-      border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .badge {
-      display: inline-block;
-      background: rgba(0, 217, 255, 0.2);
-      color: #00d9ff;
-      padding: 8px 16px;
-      border-radius: 20px;
-      font-size: 0.85rem;
-      font-weight: 600;
-      letter-spacing: 1px;
-      margin-bottom: 24px;
-    }
-    h1 { 
-      font-size: 4rem; 
-      font-weight: 700;
-      line-height: 1.1;
-      margin-bottom: 16px;
-    }
-    h1 .highlight {
-      color: #00d9ff;
-    }
-    .subtitle {
-      font-size: 1.4rem;
-      color: #a1a1aa;
-      max-width: 600px;
-      line-height: 1.6;
-    }
-    .stats {
-      display: flex;
-      gap: 40px;
-      margin-top: 48px;
-    }
-    .stat {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .stat-icon {
-      width: 40px;
-      height: 40px;
-      background: rgba(0, 217, 255, 0.1);
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .stat-value {
-      font-size: 1.5rem;
-      font-weight: 700;
-    }
-    .stat-label {
-      font-size: 0.85rem;
-      color: #a1a1aa;
-    }
-    
-    /* Slide 2: Agenda */
-    .agenda-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      margin-top: 48px;
-    }
-    .agenda-item {
-      background: rgba(255,255,255,0.05);
-      border-radius: 16px;
-      padding: 32px;
-      transition: transform 0.2s, background 0.2s;
-    }
-    .agenda-item:hover {
-      background: rgba(255,255,255,0.08);
-      transform: translateY(-4px);
-    }
-    .agenda-number {
-      width: 48px;
-      height: 48px;
-      background: linear-gradient(135deg, #00d9ff 0%, #0099cc 100%);
-      border-radius: 12px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 1.2rem;
-      font-weight: 700;
-      margin-bottom: 16px;
-    }
-    .agenda-title {
-      font-size: 1.2rem;
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-    .agenda-desc {
-      font-size: 0.9rem;
-      color: #a1a1aa;
-    }
-    
-    h2 {
-      font-size: 2.5rem;
-      margin-bottom: 16px;
-    }
-    .section-badge {
-      color: #00d9ff;
-      font-size: 0.9rem;
-      font-weight: 600;
-      letter-spacing: 2px;
-      margin-bottom: 8px;
-    }
-  </style>
-</head>
-<body>
-  <!-- Slide 1: Cover -->
-  <div class="slide">
-    <span class="badge">📊 PRESENTACIÓN GENERADA POR BRAIN</span>
-    <h1>Título de la <span class="highlight">Presentación</span></h1>
-    <p class="subtitle">
-      Esta es una presentación de ejemplo generada automáticamente. 
-      Incluye diseño moderno, estadísticas y estructura profesional.
-    </p>
+function getSlideStyles() {
+  return `<style>
+.slide { 
+  padding: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.1);
+}
+h1 { font-size: 1.8rem; font-weight: 700; margin-bottom: 12px; }
+h2 { font-size: 1.4rem; font-weight: 600; margin-bottom: 10px; }
+.badge { 
+  display: inline-block; 
+  background: rgba(139, 92, 246, 0.3); 
+  padding: 4px 12px; 
+  border-radius: 12px; 
+  font-size: 0.7rem;
+  margin-bottom: 8px;
+}
+.highlight { color: #a78bfa; }
+.subtitle { color: #a1a1aa; font-size: 0.9rem; margin-bottom: 12px; }
+.stats { display: flex; gap: 20px; margin-top: 12px; }
+.stat-value { font-size: 1.3rem; font-weight: 700; color: #a78bfa; }
+.stat-label { font-size: 0.65rem; color: #a1a1aa; }
+.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+.card { background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; }
+.card-num { color: #a78bfa; font-weight: 700; font-size: 0.9rem; }
+.card-title { font-weight: 600; font-size: 0.85rem; margin-top: 4px; }
+.card-desc { font-size: 0.75rem; color: #a1a1aa; margin-top: 2px; }
+ul { padding-left: 16px; margin-top: 8px; }
+li { font-size: 0.85rem; margin-bottom: 6px; color: #d4d4d8; }
+.conclusion { background: rgba(139, 92, 246, 0.1); padding: 12px; border-radius: 8px; margin-top: 12px; }
+</style>`;
+}
+
+const SLIDES_ARRAY = [
+  // Slide 1: Cover
+  `<div class="slide">
+    <span class="badge">🧠 BRAIN AI</span>
+    <h1>Inteligencia <span class="highlight">Artificial</span></h1>
+    <p class="subtitle">Una introducción al futuro de la tecnología</p>
     <div class="stats">
-      <div class="stat">
-        <div class="stat-icon">📄</div>
-        <div>
-          <div class="stat-value">6</div>
-          <div class="stat-label">SLIDES</div>
-        </div>
-      </div>
-      <div class="stat">
-        <div class="stat-icon">⏱️</div>
-        <div>
-          <div class="stat-value">5min</div>
-          <div class="stat-label">LECTURA</div>
-        </div>
-      </div>
+      <div><div class="stat-value">5</div><div class="stat-label">SLIDES</div></div>
+      <div><div class="stat-value">2024</div><div class="stat-label">ACTUALIZADO</div></div>
     </div>
-  </div>
+  </div>`,
   
-  <!-- Slide 2: Agenda -->
-  <div class="slide">
-    <span class="section-badge">AGENDA</span>
+  // Slide 2: Agenda
+  `<div class="slide">
+    <span class="badge">AGENDA</span>
     <h2>Contenido</h2>
-    <div class="agenda-grid">
-      <div class="agenda-item">
-        <div class="agenda-number">01</div>
-        <div class="agenda-title">Introducción</div>
-        <div class="agenda-desc">Contexto y objetivos principales</div>
-      </div>
-      <div class="agenda-item">
-        <div class="agenda-number">02</div>
-        <div class="agenda-title">Análisis</div>
-        <div class="agenda-desc">Datos y métricas clave</div>
-      </div>
-      <div class="agenda-item">
-        <div class="agenda-number">03</div>
-        <div class="agenda-title">Resultados</div>
-        <div class="agenda-desc">Hallazgos principales</div>
-      </div>
-      <div class="agenda-item">
-        <div class="agenda-number">04</div>
-        <div class="agenda-title">Impacto</div>
-        <div class="agenda-desc">Beneficios y ROI</div>
-      </div>
-      <div class="agenda-item">
-        <div class="agenda-number">05</div>
-        <div class="agenda-title">Plan</div>
-        <div class="agenda-desc">Próximos pasos</div>
-      </div>
-      <div class="agenda-item">
-        <div class="agenda-number">06</div>
-        <div class="agenda-title">Conclusión</div>
-        <div class="agenda-desc">Resumen y cierre</div>
-      </div>
+    <div class="grid">
+      <div class="card"><div class="card-num">01</div><div class="card-title">¿Qué es la IA?</div><div class="card-desc">Definición y conceptos</div></div>
+      <div class="card"><div class="card-num">02</div><div class="card-title">Aplicaciones</div><div class="card-desc">Casos de uso reales</div></div>
+      <div class="card"><div class="card-num">03</div><div class="card-title">Impacto</div><div class="card-desc">Transformación digital</div></div>
+      <div class="card"><div class="card-num">04</div><div class="card-title">Futuro</div><div class="card-desc">Tendencias y predicciones</div></div>
     </div>
-  </div>
+  </div>`,
   
-  <!-- Slide 3: Content -->
-  <div class="slide">
-    <span class="section-badge">SECCIÓN 01</span>
-    <h2>Punto Principal</h2>
-    <p class="subtitle" style="margin-top: 24px;">
-      Lorem ipsum dolor sit amet, consectetur adipiscing elit. 
-      Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
-      Ut enim ad minim veniam, quis nostrud exercitation ullamco.
-    </p>
-    <div class="stats" style="margin-top: 32px;">
-      <div class="stat">
-        <div class="stat-icon">📈</div>
-        <div>
-          <div class="stat-value">+45%</div>
-          <div class="stat-label">CRECIMIENTO</div>
-        </div>
-      </div>
-      <div class="stat">
-        <div class="stat-icon">👥</div>
-        <div>
-          <div class="stat-value">1.2M</div>
-          <div class="stat-label">USUARIOS</div>
-        </div>
-      </div>
-      <div class="stat">
-        <div class="stat-icon">⭐</div>
-        <div>
-          <div class="stat-value">4.8</div>
-          <div class="stat-label">RATING</div>
-        </div>
-      </div>
+  // Slide 3: Content
+  `<div class="slide">
+    <span class="badge">SECCIÓN 01</span>
+    <h2>¿Qué es la Inteligencia Artificial?</h2>
+    <ul>
+      <li>Sistemas que simulan <strong>inteligencia humana</strong></li>
+      <li>Capacidad de <strong>aprender</strong> y <strong>adaptarse</strong></li>
+      <li>Procesamiento de <strong>lenguaje natural</strong></li>
+      <li>Reconocimiento de patrones y <strong>toma de decisiones</strong></li>
+    </ul>
+    <div class="stats">
+      <div><div class="stat-value">$150B</div><div class="stat-label">MERCADO 2025</div></div>
+      <div><div class="stat-value">40%</div><div class="stat-label">CRECIMIENTO ANUAL</div></div>
     </div>
-  </div>
-</body>
-</html>
-`;
+  </div>`,
+  
+  // Slide 4: Applications
+  `<div class="slide">
+    <span class="badge">SECCIÓN 02</span>
+    <h2>Aplicaciones de la IA</h2>
+    <div class="grid">
+      <div class="card"><div class="card-title">🏥 Salud</div><div class="card-desc">Diagnóstico y tratamiento</div></div>
+      <div class="card"><div class="card-title">🚗 Transporte</div><div class="card-desc">Vehículos autónomos</div></div>
+      <div class="card"><div class="card-title">💼 Negocios</div><div class="card-desc">Automatización y análisis</div></div>
+      <div class="card"><div class="card-title">🎨 Creatividad</div><div class="card-desc">Generación de contenido</div></div>
+    </div>
+  </div>`,
+  
+  // Slide 5: Conclusion
+  `<div class="slide">
+    <span class="badge">CONCLUSIÓN</span>
+    <h2>El Futuro es Ahora</h2>
+    <div class="conclusion">
+      <p style="font-size: 0.9rem; margin-bottom: 8px;">La IA está transformando todos los aspectos de nuestra vida.</p>
+      <p style="font-size: 0.85rem; color: #a1a1aa;">La clave está en adoptarla de manera ética y responsable.</p>
+    </div>
+    <div class="stats" style="margin-top: 16px;">
+      <div><div class="stat-value">🚀</div><div class="stat-label">INNOVACIÓN</div></div>
+      <div><div class="stat-value">🌍</div><div class="stat-label">IMPACTO GLOBAL</div></div>
+      <div><div class="stat-value">🤝</div><div class="stat-label">COLABORACIÓN</div></div>
+    </div>
+  </div>`
+];
+
+// Keep the old MOCK_SLIDES_HTML for reference
+const MOCK_SLIDES_HTML = getSlideStyles() + SLIDES_ARRAY.join('\n');
 
 // ============================================
 // Utilities
