@@ -10,7 +10,9 @@
 		settings,
 		showArtifacts,
 		showControls,
-		artifactContents
+		artifactContents,
+		brainArtifact,
+		showBrainArtifact
 	} from '$lib/stores';
 	import { copyToClipboard, createMessagesList } from '$lib/utils';
 
@@ -20,6 +22,8 @@
 	import SvgPanZoom from '../common/SVGPanZoom.svelte';
 	import ArrowLeft from '../icons/ArrowLeft.svelte';
 	import Download from '../icons/Download.svelte';
+	import SlidesViewer from './Messages/Brain/SlidesViewer.svelte';
+	import ConsoleViewer from './Messages/Brain/ConsoleViewer.svelte';
 
 	export let overlay = false;
 
@@ -28,6 +32,9 @@
 
 	let copied = false;
 	let iframeElement: HTMLIFrameElement;
+
+	// Brain artifact state
+	let currentBrainArtifact: { type: string; content: string; title?: string; format?: string; language?: string } | null = null;
 
 	function navigateContent(direction: 'prev' | 'next') {
 		selectedContentIdx =
@@ -101,14 +108,28 @@
 			contents = value;
 			console.log('Artifact contents updated:', contents);
 
-			if (contents.length === 0) {
+			if (contents.length === 0 && !currentBrainArtifact) {
 				showControls.set(false);
 				showArtifacts.set(false);
 			}
 
 			selectedContentIdx = contents ? contents.length - 1 : 0;
 		});
+
+		// Subscribe to Brain artifacts
+		brainArtifact.subscribe((value) => {
+			currentBrainArtifact = value;
+			console.log('Brain artifact updated:', currentBrainArtifact);
+			
+			if (value) {
+				showControls.set(true);
+				showArtifacts.set(true);
+			}
+		});
 	});
+
+	// Check if we should show Brain artifact view
+	$: showBrainView = currentBrainArtifact !== null;
 </script>
 
 <div
@@ -116,7 +137,50 @@
 	id="artifacts-container"
 >
 	<div class="w-full h-full flex flex-col flex-1 relative">
-		{#if contents.length > 0}
+		{#if showBrainView && currentBrainArtifact}
+			<!-- Brain Artifact Header -->
+			<div
+				class="pointer-events-auto z-20 flex justify-between items-center p-2.5 font-primary text-gray-900 dark:text-white border-b border-gray-200 dark:border-gray-700"
+			>
+				<div class="flex-1 flex items-center gap-3">
+					<!-- Brain icon -->
+					<div class="flex items-center gap-2">
+						{#if currentBrainArtifact.type === 'slides'}
+							<svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+									d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+							</svg>
+						{:else if currentBrainArtifact.type === 'console'}
+							<svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+									d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+							</svg>
+						{:else}
+							<svg class="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+									d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+							</svg>
+						{/if}
+						<span class="text-sm font-medium">
+							{currentBrainArtifact.title || $i18n.t(currentBrainArtifact.type === 'slides' ? 'Presentation' : currentBrainArtifact.type === 'console' ? 'Console' : 'Artifact')}
+						</span>
+					</div>
+				</div>
+
+				<button
+					class="self-center pointer-events-auto p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+					on:click={() => {
+						dispatch('close');
+						brainArtifact.set(null);
+						showBrainArtifact.set(false);
+						showControls.set(false);
+						showArtifacts.set(false);
+					}}
+				>
+					<XMark className="size-4 text-gray-900 dark:text-white" />
+				</button>
+			</div>
+		{:else if contents.length > 0}
 			<div
 				class="pointer-events-auto z-20 flex justify-between items-center p-2.5 font-primar text-gray-900 dark:text-white"
 			>
@@ -228,7 +292,35 @@
 
 		<div class="flex-1 w-full h-full">
 			<div class=" h-full flex flex-col">
-				{#if contents.length > 0}
+				<!-- Brain Artifacts -->
+				{#if showBrainView && currentBrainArtifact}
+					<div class="max-w-full w-full h-full">
+						{#if currentBrainArtifact.type === 'slides'}
+							<SlidesViewer
+								content={currentBrainArtifact.content}
+								title={currentBrainArtifact.title || ''}
+								format={currentBrainArtifact.format || 'html'}
+							/>
+						{:else if currentBrainArtifact.type === 'console'}
+							<ConsoleViewer
+								entries={[{ type: 'stdout', content: currentBrainArtifact.content }]}
+								title={currentBrainArtifact.title || ''}
+								language={currentBrainArtifact.language || ''}
+							/>
+						{:else}
+							<!-- Default: render as iframe -->
+							<iframe
+								bind:this={iframeElement}
+								title="Brain Artifact"
+								srcdoc={currentBrainArtifact.content}
+								class="w-full border-0 h-full rounded-none"
+								sandbox="allow-scripts allow-downloads"
+								on:load={iframeLoadHandler}
+							></iframe>
+						{/if}
+					</div>
+				<!-- Standard Artifacts -->
+				{:else if contents.length > 0}
 					<div class="max-w-full w-full h-full">
 						{#if contents[selectedContentIdx].type === 'iframe'}
 							<iframe

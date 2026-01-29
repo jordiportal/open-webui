@@ -100,6 +100,18 @@ export const selectedTerminalId: Writable<string | null> = writable(null);
 export const artifactCode = writable(null);
 export const artifactContents = writable(null);
 
+// Brain artifact store - extended artifact support for Brain agents
+export interface BrainArtifact {
+	type: 'slides' | 'console' | 'code' | 'document' | 'html';
+	content: string;
+	title?: string;
+	format?: string;
+	language?: string;
+	timestamp?: number;
+}
+export const brainArtifact: Writable<BrainArtifact | null> = writable(null);
+export const showBrainArtifact = writable(false);
+
 export const embed = writable(null);
 
 export const temporaryChatEnabled = writable(false);

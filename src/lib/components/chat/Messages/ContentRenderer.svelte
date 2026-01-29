@@ -10,7 +10,9 @@
 		settings,
 		showArtifacts,
 		showControls,
-		showEmbeds
+		showEmbeds,
+		brainArtifact,
+		showBrainArtifact
 	} from '$lib/stores';
 	import FloatingButtons from '../ContentRenderer/FloatingButtons.svelte';
 	import { createMessagesList } from '$lib/utils';
@@ -93,6 +95,22 @@
 					break;
 				case 'sources':
 					brainSources = [...brainSources, event];
+					break;
+				case 'artifact':
+					// Update the Brain artifact store to show in the artifacts panel
+					if (event.content) {
+						brainArtifact.set({
+							type: event.artifact_type || 'html',
+							content: event.content,
+							title: event.title || '',
+							format: event.format || 'html',
+							language: event.language || '',
+							timestamp: Date.now()
+						});
+						showBrainArtifact.set(true);
+						showArtifacts.set(true);
+						showControls.set(true);
+					}
 					break;
 			}
 		}
