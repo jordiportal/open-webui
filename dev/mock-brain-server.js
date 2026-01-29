@@ -45,6 +45,20 @@ app.post('/v1/chat/completions', async (req, res) => {
     
     for (const event of events) {
       // Formato OpenAI SSE con nuestros eventos custom en el content
+      let eventContent;
+      
+      if (event.type === 'text') {
+        eventContent = event.content;
+      } else if (event.type === 'artifact' && event.content) {
+        // Para artifacts, codificar el contenido HTML en base64 para evitar conflictos
+        const eventCopy = { ...event };
+        eventCopy.content_base64 = Buffer.from(event.content).toString('base64');
+        delete eventCopy.content; // No enviar el contenido sin codificar
+        eventContent = `\n<!--BRAIN_EVENT:${JSON.stringify(eventCopy)}-->\n`;
+      } else {
+        eventContent = `\n<!--BRAIN_EVENT:${JSON.stringify(event)}-->\n`;
+      }
+      
       const chunk = {
         id: `chatcmpl-${Date.now()}`,
         object: 'chat.completion.chunk',
@@ -53,10 +67,7 @@ app.post('/v1/chat/completions', async (req, res) => {
         choices: [{
           index: 0,
           delta: {
-            // Para eventos Brain, usamos un formato especial
-            content: event.type === 'text' 
-              ? event.content 
-              : `\n<!--BRAIN_EVENT:${JSON.stringify(event)}-->\n`,
+            content: eventContent,
           },
           finish_reason: null
         }]

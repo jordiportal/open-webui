@@ -28,6 +28,24 @@ export interface ParsedContent {
 const BRAIN_EVENT_REGEX = /<!--BRAIN_EVENT:(.*?)-->/gs;
 
 /**
+ * Decode base64 string to UTF-8 text
+ */
+function decodeBase64(base64: string): string {
+	try {
+		// Browser-compatible base64 decoding
+		return decodeURIComponent(
+			atob(base64)
+				.split('')
+				.map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+				.join('')
+		);
+	} catch (e) {
+		console.warn('Failed to decode base64:', e);
+		return '';
+	}
+}
+
+/**
  * Parse Brain events from streaming content
  * Returns both the clean text and extracted events
  */
@@ -35,11 +53,21 @@ export function parseBrainEvents(content: string): ParsedContent {
 	const events: BrainEvent[] = [];
 	let text = content;
 
+	// Reset regex lastIndex to ensure fresh matching
+	BRAIN_EVENT_REGEX.lastIndex = 0;
+
 	// Extract all Brain events
 	let match;
 	while ((match = BRAIN_EVENT_REGEX.exec(content)) !== null) {
 		try {
 			const eventData = JSON.parse(match[1]);
+			
+			// Decode base64 content if present (used for artifacts with HTML)
+			if (eventData.content_base64) {
+				eventData.content = decodeBase64(eventData.content_base64);
+				delete eventData.content_base64;
+			}
+			
 			events.push(eventData);
 		} catch (e) {
 			console.warn('Failed to parse Brain event:', match[1], e);
@@ -47,6 +75,7 @@ export function parseBrainEvents(content: string): ParsedContent {
 	}
 
 	// Remove Brain event markers from text
+	BRAIN_EVENT_REGEX.lastIndex = 0; // Reset again for replace
 	text = content.replace(BRAIN_EVENT_REGEX, '').trim();
 
 	return { text, events };
