@@ -82,16 +82,36 @@
 					if (event.status === 'start') {
 						newThinking = '';
 						brainThinkingStatus = 'progress';
-					} else if (event.status === 'complete') {
+					} else if (event.status === 'complete' || event.status === 'completed') {
 						brainThinkingStatus = 'complete';
 					} else if (event.status === 'error') {
 						brainThinkingStatus = 'error';
 					} else if (event.content) {
-						newThinking += event.content;
+						// Accumulate thinking content (handles both streaming and batch)
+						if (newThinking) {
+							newThinking += '\n' + event.content;
+						} else {
+							newThinking = event.content;
+						}
+						brainThinkingStatus = 'progress';
 					}
 					break;
+				case 'outline':
+					// Treat outline as an informational action
+					brainActions = [...brainActions, {
+						action: 'outline',
+						status: 'complete',
+						content: event.title || 'Document outline'
+					}];
+					break;
 				case 'action':
-					brainActions = [...brainActions, event];
+					// Handle both 'action' and 'action_type' field names
+					brainActions = [...brainActions, {
+						...event,
+						action: event.action || event.action_type || event.title || 'Processing',
+						status: event.status === 'running' ? 'progress' : event.status === 'completed' ? 'complete' : event.status || 'progress',
+						content: event.content || event.description || ''
+					}];
 					break;
 				case 'sources':
 					brainSources = [...brainSources, event];
