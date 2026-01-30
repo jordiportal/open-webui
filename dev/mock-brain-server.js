@@ -20,6 +20,10 @@ app.get('/v1/models', (req, res) => {
       { id: 'brain-docs', object: 'model', created: Date.now(), owned_by: 'brain' },
       { id: 'brain-code', object: 'model', created: Date.now(), owned_by: 'brain' },
       { id: 'brain-research', object: 'model', created: Date.now(), owned_by: 'brain' },
+      { id: 'brain-data', object: 'model', created: Date.now(), owned_by: 'brain' },
+      { id: 'brain-files', object: 'model', created: Date.now(), owned_by: 'brain' },
+      { id: 'brain-web', object: 'model', created: Date.now(), owned_by: 'brain' },
+      { id: 'brain-image', object: 'model', created: Date.now(), owned_by: 'brain' },
     ]
   });
 });
@@ -118,7 +122,7 @@ app.post('/v1/chat/completions', async (req, res) => {
 function generateMockEvents(prompt, model) {
   const lowerPrompt = prompt.toLowerCase();
   
-  // Detectar tipo de petición
+  // Detectar tipo de petición por modelo o prompt
   if (lowerPrompt.includes('presentación') || lowerPrompt.includes('slides') || model === 'brain-slides') {
     return generateSlidesEvents(prompt);
   }
@@ -129,6 +133,26 @@ function generateMockEvents(prompt, model) {
   
   if (lowerPrompt.includes('código') || lowerPrompt.includes('programa') || model === 'brain-code') {
     return generateCodeEvents(prompt);
+  }
+  
+  if (lowerPrompt.includes('documento') || lowerPrompt.includes('informe') || lowerPrompt.includes('artículo') || model === 'brain-docs') {
+    return generateDocumentEvents(prompt);
+  }
+  
+  if (lowerPrompt.includes('datos') || lowerPrompt.includes('tabla') || lowerPrompt.includes('estadísticas') || model === 'brain-data') {
+    return generateSpreadsheetEvents(prompt);
+  }
+  
+  if (lowerPrompt.includes('archivos') || lowerPrompt.includes('directorio') || model === 'brain-files') {
+    return generateFilesEvents(prompt);
+  }
+  
+  if (lowerPrompt.includes('web') || lowerPrompt.includes('página') || lowerPrompt.includes('sitio') || model === 'brain-web') {
+    return generateWebsiteEvents(prompt);
+  }
+  
+  if (lowerPrompt.includes('imagen') || lowerPrompt.includes('foto') || lowerPrompt.includes('genera una imagen') || model === 'brain-image') {
+    return generateImageEvents(prompt);
   }
   
   // Default: chat normal con thinking
@@ -359,6 +383,161 @@ const SLIDES_ARRAY = [
 const MOCK_SLIDES_HTML = getSlideStyles() + SLIDES_ARRAY.join('\n');
 
 // ============================================
+// New Artifact Type Generators
+// ============================================
+
+function generateDocumentEvents(prompt) {
+  const documentContent = `# Informe: ${prompt}
+
+## Resumen Ejecutivo
+
+Este documento presenta un análisis detallado sobre el tema solicitado. La información ha sido recopilada de múltiples fuentes confiables y sintetizada para proporcionar una visión completa.
+
+## Introducción
+
+La investigación sobre **${prompt}** revela aspectos importantes que merecen atención. En las siguientes secciones, exploraremos los puntos clave.
+
+## Análisis Principal
+
+### Contexto Histórico
+
+El desarrollo de este tema ha evolucionado significativamente en las últimas décadas. Los principales hitos incluyen:
+
+- **2010**: Primeros avances significativos
+- **2015**: Adopción masiva inicial
+- **2020**: Consolidación de mejores prácticas
+- **2024**: Estado actual y tendencias
+
+### Datos Relevantes
+
+| Métrica | Valor | Tendencia |
+|---------|-------|-----------|
+| Adopción | 78% | ↑ Creciente |
+| Inversión | $50B | ↑ Creciente |
+| Satisfacción | 4.2/5 | → Estable |
+
+### Consideraciones Clave
+
+> "La innovación distingue a los líderes de los seguidores." - Steve Jobs
+
+Es fundamental considerar los siguientes aspectos:
+
+1. **Impacto a corto plazo**: Cambios inmediatos observables
+2. **Sostenibilidad**: Viabilidad a largo plazo
+3. **Escalabilidad**: Capacidad de crecimiento
+
+## Conclusiones
+
+El análisis demuestra que ${prompt} representa una oportunidad significativa. Las recomendaciones incluyen:
+
+- Implementación gradual
+- Monitoreo continuo
+- Adaptación según resultados
+
+## Referencias
+
+1. Estudio Global 2024, Instituto de Investigación
+2. Informe Sectorial, Consultora Líder
+3. Publicación Académica, Universidad Internacional
+`;
+
+  return [
+    { type: 'thinking', content: `Generando documento sobre: "${prompt}"\\n\\nEstructura:\\n1. Resumen ejecutivo\\n2. Introducción\\n3. Análisis\\n4. Conclusiones`, delay: 600 },
+    { type: 'action', action_type: 'search', title: 'Investigando fuentes', status: 'running', delay: 200 },
+    { type: 'action', action_type: 'search', title: 'Investigando fuentes', status: 'completed', delay: 800 },
+    { type: 'action', action_type: 'write', title: 'Redactando documento', status: 'running', delay: 200 },
+    { type: 'text', content: '\\n📝 **Generando documento...**\\n\\n', delay: 300 },
+    { type: 'artifact', artifact_type: 'document', title: 'Informe: ' + prompt.substring(0, 30), content: documentContent, format: 'markdown', delay: 1000 },
+    { type: 'action', action_type: 'write', title: 'Redactando documento', status: 'completed', delay: 200 },
+    { type: 'text', content: '\\n✅ **Documento generado** - Disponible en el panel lateral\\n', delay: 200 },
+  ];
+}
+
+function generateSpreadsheetEvents(prompt) {
+  const data = [
+    { producto: "Producto A", q1: 15000, q2: 18500, q3: 22000, q4: 25000, total: 80500, crecimiento: "12%" },
+    { producto: "Producto B", q1: 8000, q2: 9200, q3: 11000, q4: 13500, total: 41700, crecimiento: "18%" },
+    { producto: "Producto C", q1: 22000, q2: 21000, q3: 24500, q4: 28000, total: 95500, crecimiento: "8%" },
+    { producto: "Producto D", q1: 5500, q2: 7800, q3: 9200, q4: 12000, total: 34500, crecimiento: "25%" },
+    { producto: "Producto E", q1: 12000, q2: 11500, q3: 13000, q4: 15500, total: 52000, crecimiento: "10%" },
+  ];
+
+  return [
+    { type: 'thinking', content: `Preparando análisis de datos para: "${prompt}"\\n\\nGenerando tabla con métricas clave...`, delay: 500 },
+    { type: 'action', action_type: 'data', title: 'Procesando datos', status: 'running', delay: 200 },
+    { type: 'text', content: '\\n📊 **Analizando datos...**\\n\\n', delay: 300 },
+    { type: 'artifact', artifact_type: 'spreadsheet', title: 'Análisis: ' + prompt.substring(0, 25), content: JSON.stringify(data), format: 'json', metadata: { columns: ['producto', 'q1', 'q2', 'q3', 'q4', 'total', 'crecimiento'] }, delay: 1000 },
+    { type: 'action', action_type: 'data', title: 'Procesando datos', status: 'completed', delay: 200 },
+    { type: 'text', content: '\\n✅ **Tabla de datos generada** - 5 filas, 7 columnas\\n', delay: 200 },
+  ];
+}
+
+function generateFilesEvents(prompt) {
+  const filesData = {
+    files: [
+      { name: "proyecto", path: "/proyecto", type: "folder", children: [
+        { name: "src", path: "/proyecto/src", type: "folder", children: [
+          { name: "index.ts", path: "/proyecto/src/index.ts", type: "file", size: 2048 },
+          { name: "utils.ts", path: "/proyecto/src/utils.ts", type: "file", size: 1536 },
+          { name: "types.ts", path: "/proyecto/src/types.ts", type: "file", size: 892 },
+        ]},
+        { name: "docs", path: "/proyecto/docs", type: "folder", children: [
+          { name: "README.md", path: "/proyecto/docs/README.md", type: "file", size: 3200 },
+          { name: "API.md", path: "/proyecto/docs/API.md", type: "file", size: 5600 },
+        ]},
+      ]},
+      { name: "package.json", path: "/package.json", type: "file", size: 1024 },
+      { name: "tsconfig.json", path: "/tsconfig.json", type: "file", size: 512 },
+      { name: ".gitignore", path: "/.gitignore", type: "file", size: 256 },
+    ]
+  };
+
+  return [
+    { type: 'thinking', content: `Explorando estructura de archivos para: "${prompt}"`, delay: 400 },
+    { type: 'action', action_type: 'files', title: 'Escaneando directorio', status: 'running', delay: 200 },
+    { type: 'text', content: '\\n📁 **Explorando archivos...**\\n\\n', delay: 300 },
+    { type: 'artifact', artifact_type: 'files', title: 'Estructura del proyecto', content: JSON.stringify(filesData), format: 'json', metadata: { basePath: '/proyecto' }, delay: 800 },
+    { type: 'action', action_type: 'files', title: 'Escaneando directorio', status: 'completed', delay: 200 },
+    { type: 'text', content: '\\n✅ **Explorador de archivos listo** - 8 archivos encontrados\\n', delay: 200 },
+  ];
+}
+
+function generateWebsiteEvents(prompt) {
+  const websiteHTML = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Preview</title><style>body{font-family:system-ui;margin:0;padding:40px;background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);min-height:100vh;color:white;}h1{font-size:2.5rem;margin-bottom:1rem;}p{font-size:1.1rem;opacity:0.9;max-width:600px;line-height:1.6;}.card{background:rgba(255,255,255,0.1);backdrop-filter:blur(10px);border-radius:16px;padding:24px;margin-top:24px;}.btn{display:inline-block;padding:12px 24px;background:white;color:#667eea;border-radius:8px;text-decoration:none;font-weight:600;margin-top:16px;}</style></head><body><h1>Vista Previa del Sitio</h1><p>Este es un ejemplo de cómo se vería el sitio web generado. Incluye diseño responsive y estilos modernos.</p><div class="card"><h2>Características</h2><ul><li>Diseño moderno con gradientes</li><li>Tipografía clara y legible</li><li>Componentes reutilizables</li><li>Responsive por defecto</li></ul><a href="#" class="btn">Explorar más</a></div></body></html>';
+
+  return [
+    { type: 'thinking', content: `Generando preview de sitio web para: "${prompt}"`, delay: 400 },
+    { type: 'action', action_type: 'web', title: 'Creando página', status: 'running', delay: 200 },
+    { type: 'text', content: '\\n🌐 **Generando sitio web...**\\n\\n', delay: 300 },
+    { type: 'artifact', artifact_type: 'website', title: 'Preview: ' + prompt.substring(0, 25), content: websiteHTML, format: 'html', delay: 1000 },
+    { type: 'action', action_type: 'web', title: 'Creando página', status: 'completed', delay: 200 },
+    { type: 'text', content: '\\n✅ **Sitio web generado** - Preview disponible\\n', delay: 200 },
+  ];
+}
+
+function generateImageEvents(prompt) {
+  // Using placeholder images
+  const images = [
+    { src: 'https://picsum.photos/800/600?random=1', alt: 'Imagen generada 1', caption: 'Vista principal' },
+    { src: 'https://picsum.photos/800/600?random=2', alt: 'Imagen generada 2', caption: 'Vista alternativa' },
+    { src: 'https://picsum.photos/800/600?random=3', alt: 'Imagen generada 3', caption: 'Detalle' },
+  ];
+
+  return [
+    { type: 'thinking', content: `Generando imágenes para: "${prompt}"\\n\\nCreando 3 variaciones...`, delay: 500 },
+    { type: 'action', action_type: 'image', title: 'Generando imagen 1/3', status: 'running', delay: 200 },
+    { type: 'action', action_type: 'image', title: 'Generando imagen 1/3', status: 'completed', delay: 800 },
+    { type: 'action', action_type: 'image', title: 'Generando imagen 2/3', status: 'running', delay: 200 },
+    { type: 'action', action_type: 'image', title: 'Generando imagen 2/3', status: 'completed', delay: 800 },
+    { type: 'action', action_type: 'image', title: 'Generando imagen 3/3', status: 'running', delay: 200 },
+    { type: 'text', content: '\\n🖼️ **Generando imágenes...**\\n\\n', delay: 300 },
+    { type: 'artifact', artifact_type: 'image', title: 'Galería: ' + prompt.substring(0, 25), content: JSON.stringify(images), format: 'gallery', delay: 1000 },
+    { type: 'action', action_type: 'image', title: 'Generando imagen 3/3', status: 'completed', delay: 200 },
+    { type: 'text', content: '\\n✅ **Imágenes generadas** - 3 variaciones disponibles\\n', delay: 200 },
+  ];
+}
+
+// ============================================
 // Utilities
 // ============================================
 
@@ -372,22 +551,30 @@ function sleep(ms) {
 
 app.listen(PORT, () => {
   console.log(`
-╔══════════════════════════════════════════════════════════╗
-║                                                          ║
-║   🧠 Mock Brain Server                                   ║
-║                                                          ║
-║   Running on: http://localhost:${PORT}                    ║
-║                                                          ║
-║   Endpoints:                                             ║
-║   - GET  /v1/models                                      ║
-║   - POST /v1/chat/completions                            ║
-║                                                          ║
-║   Test commands:                                         ║
-║   - "Crea una presentación sobre X"  → Slides artifact   ║
-║   - "Busca información sobre Y"      → Research mode     ║
-║   - "Escribe código para Z"          → Code + console    ║
-║   - Any other message                → Chat mode         ║
-║                                                          ║
-╚══════════════════════════════════════════════════════════╝
+╔═══════════════════════════════════════════════════════════════╗
+║                                                               ║
+║   🧠 Mock Brain Server                                        ║
+║                                                               ║
+║   Running on: http://localhost:${PORT}                         ║
+║                                                               ║
+║   Endpoints:                                                  ║
+║   - GET  /v1/models                                           ║
+║   - POST /v1/chat/completions                                 ║
+║                                                               ║
+║   Test commands (artifact types):                             ║
+║   - "Crea una presentación sobre X"  → Slides                 ║
+║   - "Escribe un documento sobre Y"   → Document (Markdown)    ║
+║   - "Muestra datos/tabla de Z"       → Spreadsheet            ║
+║   - "Escribe código para W"          → Terminal + Code        ║
+║   - "Muestra archivos del proyecto"  → Files browser          ║
+║   - "Crea una página web"            → Website preview        ║
+║   - "Genera una imagen de X"         → Image gallery          ║
+║   - "Busca información sobre Y"      → Research (sources)     ║
+║                                                               ║
+║   Models: brain-chat, brain-slides, brain-docs, brain-code,   ║
+║           brain-research, brain-data, brain-files, brain-web, ║
+║           brain-image                                         ║
+║                                                               ║
+╚═══════════════════════════════════════════════════════════════╝
   `);
 });

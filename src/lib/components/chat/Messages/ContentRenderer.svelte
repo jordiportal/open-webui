@@ -24,6 +24,9 @@
 	export let id;
 	export let content;
 
+	// Store the artifact for this message so we can reopen it
+	let localArtifact = null;
+
 	export let history;
 	export let messageId;
 
@@ -119,14 +122,17 @@
 				case 'artifact':
 					// Update the Brain artifact store to show in the artifacts panel
 					if (event.content) {
-						brainArtifact.set({
+						const artifact = {
 							type: event.artifact_type || 'html',
 							content: event.content,
 							title: event.title || '',
 							format: event.format || 'html',
 							language: event.language || '',
 							timestamp: Date.now()
-						});
+						};
+						// Store locally so we can reopen it later
+						localArtifact = artifact;
+						brainArtifact.set(artifact);
 						showBrainArtifact.set(true);
 						showArtifacts.set(true);
 						showControls.set(true);
@@ -212,6 +218,16 @@
 			closeFloatingButtons();
 		}
 	};
+
+	// Reopen artifact panel with the stored artifact
+	function reopenArtifact() {
+		if (localArtifact) {
+			brainArtifact.set(localArtifact);
+			showBrainArtifact.set(true);
+			showArtifacts.set(true);
+			showControls.set(true);
+		}
+	}
 
 	onMount(() => {
 		if (floatingButtons) {
@@ -327,6 +343,34 @@
 			await showEmbeds.set(false);
 		}}
 	/>
+
+	<!-- Artifact card button to reopen -->
+	{#if localArtifact && done}
+		<button
+			class="artifact-card group flex items-center gap-3 w-full mt-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 text-left"
+			on:click={reopenArtifact}
+		>
+			<div class="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+				<svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+						d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+				</svg>
+			</div>
+			<div class="flex-1 min-w-0">
+				<div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+					{localArtifact.title || $i18n.t('Presentation')}
+				</div>
+				<div class="text-xs text-gray-500 dark:text-gray-400">
+					{localArtifact.type === 'slides' ? $i18n.t('Click to view slides') : $i18n.t('Click to view artifact')}
+				</div>
+			</div>
+			<div class="flex-shrink-0 text-gray-400 group-hover:text-purple-500 transition-colors">
+				<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+				</svg>
+			</div>
+		</button>
+	{/if}
 </div>
 
 {#if floatingButtons && model}

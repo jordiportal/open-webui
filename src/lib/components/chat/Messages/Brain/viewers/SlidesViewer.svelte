@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
-	import { createEventDispatcher, getContext, onMount } from 'svelte';
+	import { createEventDispatcher, getContext } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
 	import { copyToClipboard } from '$lib/utils';
@@ -16,6 +16,37 @@
 	let slides: string[] = [];
 	let containerElement: HTMLDivElement;
 
+	// CSS for slide iframes
+	const SLIDE_CSS = [
+		'* { margin: 0; padding: 0; box-sizing: border-box; }',
+		'html, body { height: 100%; width: 100%; overflow: hidden; font-family: system-ui, sans-serif; background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); color: #e4e4e7; }',
+		'body { display: flex; align-items: center; justify-content: center; padding: 1.5rem; }',
+		'.slide-wrapper { width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; }',
+		'h1, h2, h3 { margin-bottom: 0.75rem; line-height: 1.2; }',
+		'h1 { font-size: 1.75rem; font-weight: 700; }',
+		'h2 { font-size: 1.4rem; font-weight: 600; }',
+		'h3 { font-size: 1.1rem; font-weight: 500; }',
+		'p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.5rem; }',
+		'ul, ol { text-align: left; margin: 0.5rem 0; padding-left: 1.5rem; }',
+		'li { font-size: 0.9rem; margin-bottom: 0.3rem; }',
+		'.badge, .section-badge { display: inline-block; padding: 0.2rem 0.6rem; background: rgba(139, 92, 246, 0.3); border-radius: 1rem; font-size: 0.7rem; margin-bottom: 0.5rem; }',
+		'.highlight { color: #a78bfa; }',
+		'.stats { display: flex; gap: 1rem; justify-content: center; margin-top: 0.5rem; }',
+		'.stat { text-align: center; }',
+		'.stat-value { font-size: 1.5rem; font-weight: 700; color: #a78bfa; }',
+		'.stat-label { font-size: 0.7rem; opacity: 0.7; }',
+		'.grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem; margin-top: 0.75rem; }',
+		'.card { background: rgba(255,255,255,0.05); padding: 0.75rem; border-radius: 0.5rem; }',
+		'.card-num { color: #a78bfa; font-weight: 700; font-size: 0.85rem; }',
+		'.card-title { font-weight: 600; font-size: 0.8rem; margin-top: 0.25rem; }',
+		'.card-desc { font-size: 0.7rem; color: #a1a1aa; margin-top: 0.15rem; }',
+		'.conclusion { background: rgba(139, 92, 246, 0.1); padding: 0.75rem; border-radius: 0.5rem; margin-top: 0.75rem; }'
+	].join(' ');
+
+	// Build tags dynamically to avoid PostCSS issues
+	const STYLE_OPEN = '<' + 'style>';
+	const STYLE_CLOSE = '</' + 'style>';
+
 	// Parse slides from HTML content
 	function parseSlides(html: string): string[] {
 		if (!html) return [];
@@ -23,82 +54,29 @@
 		const tempDiv = document.createElement('div');
 		tempDiv.innerHTML = html;
 
-		// Look for slide elements
-		let slideElements = tempDiv.querySelectorAll('.slide, section.slide, [data-slide]');
+		const slideElements = tempDiv.querySelectorAll('.slide, section.slide, [data-slide]');
 		
 		if (slideElements.length > 0) {
 			return Array.from(slideElements).map(s => s.outerHTML);
 		}
 
-		// If no slide markers, return full content as single slide
 		return [html];
 	}
 
 	// Generate HTML for a single slide iframe
 	function generateSlideHTML(slideContent: string): string {
-		// Extract styles from original content if present
-		const styleMatch = content.match(/<style[^>]*>([\s\S]*?)<\/style>/i);
-		const styles = styleMatch ? styleMatch[1] : '';
+		// Build the HTML document for the iframe
+		const styleTagRegex = new RegExp(STYLE_OPEN.replace(/[<>]/g, '\\$&') + '([\\s\\S]*?)' + STYLE_CLOSE.replace(/[<>/]/g, '\\$&'), 'i');
+		const styleMatch = content.match(styleTagRegex);
+		const extraStyles = styleMatch ? styleMatch[1] : '';
 		
-		return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<style>
-* { margin: 0; padding: 0; box-sizing: border-box; }
-html, body { 
-	height: 100%;
-	width: 100%;
-	overflow: hidden;
-	font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-	background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-	color: #e4e4e7;
-}
-body {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	padding: 1.5rem;
-}
-.slide-wrapper {
-	width: 100%;
-	height: 100%;
-	display: flex;
-	flex-direction: column;
-	justify-content: center;
-	align-items: center;
-	text-align: center;
-}
-h1, h2, h3 { margin-bottom: 0.75rem; line-height: 1.2; }
-h1 { font-size: 1.75rem; font-weight: 700; }
-h2 { font-size: 1.4rem; font-weight: 600; }
-h3 { font-size: 1.1rem; font-weight: 500; }
-p { font-size: 0.95rem; line-height: 1.5; margin-bottom: 0.5rem; }
-ul, ol { text-align: left; margin: 0.5rem 0; padding-left: 1.5rem; }
-li { font-size: 0.9rem; margin-bottom: 0.3rem; }
-.badge, .section-badge { 
-	display: inline-block;
-	padding: 0.2rem 0.6rem;
-	background: rgba(139, 92, 246, 0.3);
-	border-radius: 1rem;
-	font-size: 0.7rem;
-	margin-bottom: 0.5rem;
-}
-.highlight { color: #a78bfa; }
-.stats { display: flex; gap: 1rem; justify-content: center; margin-top: 0.5rem; }
-.stat { text-align: center; }
-.stat-value { font-size: 1.5rem; font-weight: 700; color: #a78bfa; }
-.stat-label { font-size: 0.7rem; opacity: 0.7; }
-${styles}
-</style>
-</head>
-<body>
-<div class="slide-wrapper">${slideContent}</div>
-</body>
-</html>`;
+		return '<!DOCTYPE html><html><head><meta charset="utf-8">' + 
+			STYLE_OPEN + SLIDE_CSS + ' ' + extraStyles + STYLE_CLOSE +
+			'</head><body><div class="slide-wrapper">' + 
+			slideContent + 
+			'</div></body></html>';
 	}
 
-	// Reactively parse slides when content changes
 	$: if (content) {
 		slides = parseSlides(content);
 	}
@@ -115,7 +93,7 @@ ${styles}
 		const url = URL.createObjectURL(blob);
 		const a = document.createElement('a');
 		a.href = url;
-		a.download = `${title || 'presentation'}.html`;
+		a.download = (title || 'presentation') + '.html';
 		a.click();
 		URL.revokeObjectURL(url);
 		toast.success($i18n.t('Downloaded'));
@@ -129,7 +107,6 @@ ${styles}
 </script>
 
 <div class="slides-viewer flex flex-col h-full bg-gray-900" transition:fade={{ duration: 150 }}>
-	<!-- Header -->
 	<div class="flex items-center justify-between px-3 py-2 bg-gray-800 border-b border-gray-700 flex-shrink-0">
 		<div class="flex items-center gap-2">
 			<svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,7 +163,6 @@ ${styles}
 		</div>
 	</div>
 
-	<!-- Slides Container - Vertical scroll with 16:9 slides -->
 	<div 
 		bind:this={containerElement}
 		class="flex-1 overflow-y-auto p-3 space-y-3 bg-gray-950"
@@ -201,11 +177,11 @@ ${styles}
 					<div class="slide-number text-xs text-gray-500 mb-1 px-1">
 						Slide {idx + 1}
 					</div>
-					<div class="slide-frame aspect-video w-full rounded-lg overflow-hidden shadow-lg border border-gray-800">
+					<div class="slide-frame rounded-lg overflow-hidden shadow-lg border border-gray-800">
 						<iframe
 							title="Slide {idx + 1}"
 							srcdoc={generateSlideHTML(slide)}
-							class="w-full h-full border-0"
+							class="w-full border-0"
 							sandbox="allow-scripts"
 						></iframe>
 					</div>
@@ -216,15 +192,16 @@ ${styles}
 </div>
 
 <style>
-	.aspect-video {
-		aspect-ratio: 16 / 9;
-	}
-	
 	.slides-viewer {
 		min-height: 300px;
 	}
 	
 	.slide-frame {
+		aspect-ratio: 16 / 9;
 		background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+	}
+	
+	.slide-frame iframe {
+		height: 100%;
 	}
 </style>

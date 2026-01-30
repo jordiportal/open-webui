@@ -101,12 +101,25 @@ export const artifactCode = writable(null);
 export const artifactContents = writable(null);
 
 // Brain artifact store - extended artifact support for Brain agents
+export type ArtifactType = 
+	| 'document'     // Markdown/HTML text documents
+	| 'slides'       // Presentations
+	| 'spreadsheet'  // Tables/data (JSON or CSV)
+	| 'terminal'     // Command output
+	| 'files'        // File browser
+	| 'website'      // URL or HTML preview
+	| 'image'        // Single image or gallery
+	| 'console'      // Legacy: console output
+	| 'code'         // Legacy: code preview
+	| 'html';        // Legacy: raw HTML
+
 export interface BrainArtifact {
-	type: 'slides' | 'console' | 'code' | 'document' | 'html';
+	type: ArtifactType;
 	content: string;
 	title?: string;
-	format?: string;
-	language?: string;
+	format?: string;           // 'markdown', 'html', 'json', 'csv', 'url', 'base64', etc.
+	language?: string;         // For code: programming language
+	metadata?: Record<string, any>; // Type-specific metadata
 	timestamp?: number;
 }
 export const brainArtifact: Writable<BrainArtifact | null> = writable(null);
