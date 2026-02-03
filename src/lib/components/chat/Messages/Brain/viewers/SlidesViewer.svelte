@@ -1,13 +1,19 @@
 <script lang="ts">
 	import { fade } from 'svelte/transition';
-	import { createEventDispatcher, getContext } from 'svelte';
+	import { createEventDispatcher, getContext, onMount } from 'svelte';
 	import type { Writable } from 'svelte/store';
 	import type { i18n as i18nType } from 'i18next';
 	import { copyToClipboard } from '$lib/utils';
 	import { toast } from 'svelte-sonner';
+	import { convertAndDownloadSlides, openInOnlyOffice, getOnlyOfficeStatus } from '$lib/apis/slides';
 
 	const i18n = getContext<Writable<i18nType>>('i18n');
 	const dispatch = createEventDispatcher();
+
+	// Get token from localStorage
+	function getToken(): string {
+		return localStorage.getItem('token') || '';
+	}
 
 	export let content: string = '';
 	export let title: string = '';
@@ -15,6 +21,19 @@
 	let copied = false;
 	let slides: string[] = [];
 	let containerElement: HTMLDivElement;
+	let isDownloading = false;
+	let isOpeningOnlyOffice = false;
+	let onlyOfficeEnabled = false;
+
+	// Check OnlyOffice status on mount
+	onMount(async () => {
+		try {
+			const status = await getOnlyOfficeStatus(getToken());
+			onlyOfficeEnabled = status.enabled;
+		} catch (e) {
+			onlyOfficeEnabled = false;
+		}
+	});
 
 	// CSS for slide iframes
 	const SLIDE_CSS = [
@@ -88,15 +107,36 @@
 		setTimeout(() => { copied = false; }, 2000);
 	}
 
-	function downloadSlides() {
-		const blob = new Blob([content], { type: 'text/html' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = (title || 'presentation') + '.html';
-		a.click();
-		URL.revokeObjectURL(url);
-		toast.success($i18n.t('Downloaded'));
+	async function downloadSlidesPptx() {
+		if (isDownloading) return;
+		
+		isDownloading = true;
+		try {
+			await convertAndDownloadSlides(getToken(), content, title || 'Presentation');
+			toast.success($i18n.t('PPTX downloaded'));
+		} catch (error) {
+			console.error('Error downloading PPTX:', error);
+			toast.error($i18n.t('Failed to download PPTX'));
+		} finally {
+			isDownloading = false;
+		}
+	}
+
+	async function handleOpenInOnlyOffice() {
+		if (isOpeningOnlyOffice) return;
+		
+		isOpeningOnlyOffice = true;
+		try {
+			const result = await openInOnlyOffice(getToken(), content, title || 'Presentation');
+			if (!result.success) {
+				toast.error(result.error || $i18n.t('Failed to open in OnlyOffice'));
+			}
+		} catch (error) {
+			console.error('Error opening in OnlyOffice:', error);
+			toast.error($i18n.t('Failed to open in OnlyOffice'));
+		} finally {
+			isOpeningOnlyOffice = false;
+		}
 	}
 
 	function openInNewTab() {
@@ -122,10 +162,11 @@
 		</div>
 
 		<div class="flex items-center gap-0.5">
+			<!-- Copy button -->
 			<button
 				class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
 				on:click={handleCopy}
-				title={$i18n.t('Copy')}
+				title={$i18n.t('Copy HTML')}
 			>
 				{#if copied}
 					<svg class="w-3.5 h-3.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,10 +180,11 @@
 				{/if}
 			</button>
 
+			<!-- Open in new tab (HTML preview) -->
 			<button
 				class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
 				on:click={openInNewTab}
-				title={$i18n.t('Open in new tab')}
+				title={$i18n.t('Preview HTML')}
 			>
 				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
@@ -150,16 +192,49 @@
 				</svg>
 			</button>
 
+			<!-- Download PPTX button -->
 			<button
-				class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors"
-				on:click={downloadSlides}
-				title={$i18n.t('Download')}
+				class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+				on:click={downloadSlidesPptx}
+				disabled={isDownloading}
+				title={$i18n.t('Download PPTX')}
 			>
-				<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-						d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-				</svg>
+				{#if isDownloading}
+					<svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+							d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+					</svg>
+				{:else}
+					<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+					</svg>
+				{/if}
 			</button>
+
+			<!-- Open in OnlyOffice button (only if enabled) -->
+			{#if onlyOfficeEnabled}
+				<button
+					class="p-1 rounded hover:bg-gray-700 text-gray-400 hover:text-white transition-colors disabled:opacity-50"
+					on:click={handleOpenInOnlyOffice}
+					disabled={isOpeningOnlyOffice}
+					title={$i18n.t('Edit in OnlyOffice')}
+				>
+					{#if isOpeningOnlyOffice}
+						<svg class="w-3.5 h-3.5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+								d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+						</svg>
+					{:else}
+						<!-- OnlyOffice/Edit icon -->
+						<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+								d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+						</svg>
+					{/if}
+				</button>
+			{/if}
+
 		</div>
 	</div>
 

@@ -188,33 +188,27 @@ function generateSlidesEvents(prompt) {
     ], delay: 400 },
     
     { type: 'action', action_type: 'slides', title: 'Generando presentación', status: 'running', delay: 200 },
-    
-    { type: 'text', content: '\n\n🎨 **Generando presentación...**\n\n', delay: 200 },
   ];
 
-  // Add each slide progressively
+  // Add each slide progressively (only artifact events, no text spam)
   const slideContents = SLIDES_ARRAY;
   let accumulatedHTML = getSlideStyles();
   
   slideContents.forEach((slide, index) => {
     accumulatedHTML += slide;
     events.push({
-      type: 'text',
-      content: `📄 Slide ${index + 1} generada...\n`,
-      delay: 300
-    });
-    events.push({
       type: 'artifact',
       artifact_type: 'slides',
       title: 'Presentación: ' + prompt.substring(0, 30),
       content: accumulatedHTML,
       format: 'html',
+      slide_count: index + 1,
+      total_slides: slideContents.length,
       delay: 800
     });
   });
 
   events.push({ type: 'action', action_type: 'slides', title: 'Generando presentación', status: 'completed', delay: 300 });
-  events.push({ type: 'text', content: '\n✅ **Presentación completada** - 5 slides generadas\n', delay: 200 });
 
   return events;
 }

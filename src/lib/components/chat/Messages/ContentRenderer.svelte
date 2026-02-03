@@ -19,7 +19,8 @@
 	import { parseBrainEvents, isBrainModel } from '$lib/utils/brain';
 	import ThinkingBlock from './Brain/ThinkingBlock.svelte';
 	import ActionBlock from './Brain/ActionBlock.svelte';
-	import SourcesBlock from './Brain/SourcesBlock.svelte';
+	import SearchBlock from './Brain/SearchBlock.svelte';
+	import ActivityBlock from './Brain/ActivityBlock.svelte';
 
 	export let id;
 	export let content;
@@ -56,7 +57,10 @@
 	let brainThinking = '';
 	let brainThinkingStatus = 'progress';
 	let brainActions = [];
-	let brainSources = [];
+	// Search state (combines action + sources)
+	let brainSearch = null; // { title, status, resultsCount, sources }
+	// Activity state (for artifact generation like slides, images, etc.)
+	let brainActivity = null; // { title, status, icon, items }
 
 	// Determine if this is a Brain model response
 	$: isBrain = model?.id ? isBrainModel(model.id) : false;
@@ -74,10 +78,53 @@
 		brainThinkingStatus = 'complete';
 	}
 
+	// Parse slide items from HTML content
+	function parseSlideItems(html) {
+		const items = [];
+		try {
+			const tempDiv = document.createElement('div');
+			tempDiv.innerHTML = html;
+			const slides = tempDiv.querySelectorAll('.slide, section.slide, [data-slide]');
+			slides.forEach((slide, idx) => {
+				// Try to get title from h1, h2, or first text content
+				const h1 = slide.querySelector('h1');
+				const h2 = slide.querySelector('h2');
+				const badge = slide.querySelector('.badge');
+				let label = `Slide ${idx + 1}`;
+				if (h1) {
+					label = h1.textContent?.trim() || label;
+				} else if (h2) {
+					label = h2.textContent?.trim() || label;
+				}
+				if (badge) {
+					label = `${badge.textContent?.trim()}: ${label}`;
+				}
+				items.push({ label });
+			});
+		} catch (e) {
+			// Fallback: just return empty
+		}
+		return items;
+	}
+
 	function processBrainEvents(events) {
 		let newThinking = '';
 		brainActions = [];
-		brainSources = [];
+		brainSearch = null;
+		brainActivity = null;
+
+		// Actions that show as ActivityBlock (artifact generation)
+		const activityActions = ['slides', 'image', 'web', 'files', 'data', 'document'];
+		
+		// Labels for activity actions (Spanish)
+		const activityLabels = {
+			slides: 'Generando presentación',
+			image: 'Generando imagen',
+			web: 'Generando página web',
+			files: 'Explorando archivos',
+			data: 'Procesando datos',
+			document: 'Generando documento'
+		};
 
 		for (const event of events) {
 			switch (event.type) {
@@ -104,20 +151,76 @@
 					brainActions = [...brainActions, {
 						action: 'outline',
 						status: 'complete',
-						content: event.title || 'Document outline'
+						content: event.title || 'Estructura del documento'
 					}];
 					break;
 				case 'action':
 					// Handle both 'action' and 'action_type' field names
-					brainActions = [...brainActions, {
+					const actionKey = event.action || event.action_type || event.title || 'Processing';
+					const actionStatus = event.status === 'running' ? 'progress' : event.status === 'completed' ? 'complete' : event.status || 'progress';
+					
+					// Handle search actions specially - they will be combined with sources
+					if (actionKey === 'search') {
+						brainSearch = {
+							title: event.title || 'Buscando',
+							status: actionStatus,
+							resultsCount: event.results_count || 0,
+							sources: brainSearch?.sources || []
+						};
+						break;
+					}
+					
+					// Handle activity actions (artifact generation)
+					if (activityActions.includes(actionKey)) {
+						// Preserve existing items when updating activity
+						brainActivity = {
+							title: activityLabels[actionKey] || event.title || 'Procesando',
+							status: actionStatus,
+							icon: actionKey,
+							items: brainActivity?.items || []
+						};
+						break;
+					}
+					
+					const newAction = {
 						...event,
-						action: event.action || event.action_type || event.title || 'Processing',
-						status: event.status === 'running' ? 'progress' : event.status === 'completed' ? 'complete' : event.status || 'progress',
+						action: actionKey,
+						status: actionStatus,
 						content: event.content || event.description || ''
-					}];
+					};
+					
+					// Find existing action with same key and update it, or add new
+					const existingIdx = brainActions.findIndex(a => a.action === actionKey);
+					if (existingIdx >= 0) {
+						// Update existing action
+						brainActions = [
+							...brainActions.slice(0, existingIdx),
+							newAction,
+							...brainActions.slice(existingIdx + 1)
+						];
+					} else {
+						// Add new action
+						brainActions = [...brainActions, newAction];
+					}
 					break;
 				case 'sources':
-					brainSources = [...brainSources, event];
+					// Combine sources with search action
+					if (event.sources && event.sources.length > 0) {
+						if (brainSearch) {
+							brainSearch = {
+								...brainSearch,
+								sources: event.sources
+							};
+						} else {
+							// Create search block if sources arrive before action
+							brainSearch = {
+								title: 'Búsqueda',
+								status: 'complete',
+								resultsCount: event.sources.length,
+								sources: event.sources
+							};
+						}
+					}
 					break;
 				case 'artifact':
 					// Update the Brain artifact store to show in the artifacts panel
@@ -136,6 +239,23 @@
 						showBrainArtifact.set(true);
 						showArtifacts.set(true);
 						showControls.set(true);
+						
+						// Extract items for activity block (e.g., slides)
+						if (brainActivity && event.artifact_type === 'slides') {
+							// Parse slides from HTML to get count and titles
+							const slideItems = parseSlideItems(event.content);
+							const currentCount = event.slide_count || slideItems.length;
+							const totalSlides = event.total_slides || slideItems.length;
+							const isComplete = currentCount >= totalSlides;
+							
+							brainActivity = { 
+								...brainActivity, 
+								items: slideItems, // No status per item, just labels
+								status: isComplete ? 'complete' : 'progress'
+							};
+						} else if (brainActivity) {
+							brainActivity = { ...brainActivity, status: 'complete' };
+						}
 					}
 					break;
 			}
@@ -247,12 +367,32 @@
 </script>
 
 <div bind:this={contentContainerElement}>
-	<!-- Brain Events (Thinking, Actions, Sources) -->
+	<!-- Brain Events (Thinking, Search, Activity, Actions) -->
 	{#if isBrain}
 		{#if brainThinking}
 			<ThinkingBlock
 				content={brainThinking}
 				status={brainThinkingStatus}
+				collapsed={done}
+			/>
+		{/if}
+
+		{#if brainSearch}
+			<SearchBlock
+				title={brainSearch.title}
+				status={brainSearch.status}
+				resultsCount={brainSearch.resultsCount}
+				sources={brainSearch.sources || []}
+				collapsed={done}
+			/>
+		{/if}
+
+		{#if brainActivity}
+			<ActivityBlock
+				title={brainActivity.title}
+				status={brainActivity.status}
+				icon={brainActivity.icon}
+				items={brainActivity.items || []}
 				collapsed={done}
 			/>
 		{/if}
@@ -267,14 +407,6 @@
 					/>
 				{/each}
 			</div>
-		{/if}
-
-		{#if brainSources.length > 0}
-			{#each brainSources as sourceEvent}
-				{#if sourceEvent.sources && sourceEvent.sources.length > 0}
-					<SourcesBlock sources={sourceEvent.sources} />
-				{/if}
-			{/each}
 		{/if}
 	{/if}
 
