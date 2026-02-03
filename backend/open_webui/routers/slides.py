@@ -231,10 +231,13 @@ async def get_onlyoffice_config(
         )
     
     try:
-        # Build file URL (must be accessible by OnlyOffice server)
-        base_url = WEBUI_URL or "http://localhost:8080"
-        file_url = f"{base_url}/api/v1/slides/{file_id}/content"
-        callback_url = f"{base_url}/api/v1/slides/callback"
+        # Build file URL (must be accessible by OnlyOffice server running in Docker)
+        # Use host.docker.internal for Docker on Mac/Windows to access host services
+        webui_url = str(WEBUI_URL) if WEBUI_URL else ""
+        base_url = webui_url or "http://localhost:8080"
+        docker_base_url = base_url.replace("localhost", "host.docker.internal").replace("127.0.0.1", "host.docker.internal")
+        file_url = f"{docker_base_url}/api/v1/slides/{file_id}/content"
+        callback_url = f"{docker_base_url}/api/v1/slides/callback"
         
         # Generate editor config
         config_data = generate_editor_config(

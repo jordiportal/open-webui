@@ -200,7 +200,7 @@ export const getOnlyOfficeStatus = async (
 
 /**
  * Open file in OnlyOffice editor
- * Converts HTML to PPTX first, then gets OnlyOffice config and opens in new window
+ * Converts HTML to PPTX first, then opens editor route in new window
  */
 export const openInOnlyOffice = async (
 	token: string,
@@ -211,19 +211,8 @@ export const openInOnlyOffice = async (
 		// First convert to PPTX
 		const convertResult = await convertSlidesToPptx(token, html, title);
 		
-		// Get OnlyOffice config
-		const config = await getOnlyOfficeConfig(token, convertResult.file_id);
-		
-		if (!config.enabled) {
-			return { 
-				success: false, 
-				error: config.error || 'OnlyOffice is not enabled' 
-			};
-		}
-		
-		// Open OnlyOffice editor in new window
-		// The page at /slides/edit/{fileId} will load the OnlyOffice editor
-		const editorUrl = `/slides/edit/${convertResult.file_id}`;
+		// Open the editor route with the file ID
+		const editorUrl = `/editor/${convertResult.file_id}`;
 		window.open(editorUrl, '_blank');
 		
 		return { success: true };

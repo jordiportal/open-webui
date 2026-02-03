@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  onlyoffice-postgres:
+    image: postgres:15-alpine
+    container_name: onlyoffice-postgres
+    environment:
+      POSTGRES_DB: onlyoffice
+      POSTGRES_USER: onlyoffice
+      POSTGRES_PASSWORD: onlyoffice
+    volumes:
+      - onlyoffice-postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  onlyoffice-rabbitmq:
+    image: rabbitmq:3-alpine
+    container_name: onlyoffice-rabbitmq
+    restart: unless-stopped
+
+  onlyoffice-docs:
+    image: onlyoffice/documentserver:latest
+    container_name: onlyoffice-docs
+    depends_on:
+      - onlyoffice-postgres
+      - onlyoffice-rabbitmq
+    environment:
+      - DB_TYPE=postgres
+      - DB_HOST=onlyoffice-postgres
+      - DB_PORT=5432
+      - DB_NAME=onlyoffice
+      - DB_USER=onlyoffice
+      - DB_PWD=onlyoffice
+      - AMQP_URI=amqp://guest:guest@onlyoffice-rabbitmq
+      - JWT_ENABLED=true
+      - JWT_SECRET=my-onlyoffice-secret-key
+    ports:
+      - "8088:80"
+    volumes:
+      - onlyoffice-data:/var/www/onlyoffice/Data
+      - onlyoffice-logs:/var/log/onlyoffice
+    restart: unless-stopped
+
+volumes:
+  onlyoffice-postgres-data:
+  onlyoffice-data:
+  onlyoffice-logs:
