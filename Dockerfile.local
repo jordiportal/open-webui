@@ -1,0 +1,107 @@
+# syntax=docker/dockerfile:1
+# Dockerfile modificado para compilar en Linux/Docker
+# con soporte para dependencias legacy
+
+ARG USE_CUDA=false
+ARG USE_OLLAMA=false
+ARG USE_SLIM=false
+ARG USE_PERMISSION_HARDENING=false
+ARG USE_CUDA_VER=cu128
+ARG USE_EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+ARG USE_RERANKING_MODEL=""
+ARG USE_AUXILIARY_EMBEDDING_MODEL=TaylorAI/bge-micro-v2
+ARG USE_TIKTOKEN_ENCODING_NAME="cl100k_base"
+ARG BUILD_HASH=dev-build
+ARG UID=0
+ARG GID=0
+
+######## WebUI frontend ########
+FROM --platform=$BUILDPLATFORM node:22-alpine3.20 AS build
+ARG BUILD_HASH
+
+WORKDIR /app
+
+RUN apk add --no-cache git
+
+# Copiar archivos de dependencias
+COPY package.json package-lock.json ./
+
+# Usar install con legacy-peer-deps para resolver conflictos
+RUN npm install --legacy-peer-deps
+
+COPY . .
+ENV APP_BUILD_HASH=${BUILD_HASH}
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+RUN npm run build
+
+######## WebUI backend ########
+FROM python:3.11.14-slim-bookworm AS base
+
+ARG USE_CUDA
+ARG USE_OLLAMA
+ARG USE_SLIM
+ARG USE_PERMISSION_HARDENING
+ARG USE_CUDA_VER
+ARG USE_EMBEDDING_MODEL
+ARG USE_RERANKING_MODEL
+ARG USE_AUXILIARY_EMBEDDING_MODEL
+ARG USE_TIKTOKEN_ENCODING_NAME
+ARG UID
+ARG GID
+ARG BUILD_HASH
+
+# Environment variables
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app/backend
+
+# System dependencies (including jq for healthcheck)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git build-essential pandoc gcc netcat-openbsd curl jq \
+    python3-dev \
+    ffmpeg libsm6 libxext6 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy built frontend
+COPY --from=build /app/build /app/build
+COPY --from=build /app/CHANGELOG.md /app/CHANGELOG.md
+COPY --from=build /app/package.json /app/package.json
+
+# Copy backend code
+COPY backend/ .
+
+# Copy CHANGELOG.md to package directory for pkgutil.get_data
+COPY --from=build /app/CHANGELOG.md /app/backend/open_webui/CHANGELOG.md
+
+# Install Python dependencies
+RUN pip install --no-cache-dir uv && \
+    uv pip install --system -r requirements.txt --no-cache-dir
+
+# Create user if not root
+RUN if [ "$UID" -ne 0 ]; then \
+    groupadd -g $GID appuser && \
+    useradd -u $UID -g $GID -d /app -s /bin/bash appuser && \
+    chown -R $UID:$GID /app; \
+    fi
+
+# Ensure data directory exists with correct permissions
+RUN mkdir -p /app/backend/data && chown -R $UID:$GID /app/backend/data
+
+# Expose port
+EXPOSE 8080
+
+# Environment variables needed for startup
+ENV HOME=/root
+ENV PORT=8080
+ENV HOST=0.0.0.0
+ENV DOCKER=true
+
+# Health check (same as original Dockerfile)
+HEALTHCHECK CMD curl --silent --fail http://localhost:${PORT:-8080}/health | jq -ne 'input.status == true' || exit 1
+
+# Use the official start script that handles all initialization
+CMD ["bash", "start.sh"]

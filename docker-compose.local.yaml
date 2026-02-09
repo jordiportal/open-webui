@@ -1,0 +1,36 @@
+services:
+  mock-brain-server:
+    build:
+      context: ./dev
+      dockerfile: Dockerfile.mock
+    container_name: mock-brain-server
+    ports:
+      - "8001:8001"
+    restart: unless-stopped
+
+  open-webui:
+    build:
+      context: .
+      dockerfile: Dockerfile.local
+    image: open-webui:brain-local
+    container_name: open-webui
+    volumes:
+      - open-webui:/app/backend/data
+    ports:
+      - ${OPEN_WEBUI_PORT-8080}:8080
+    environment:
+      # Mock Brain Server (internal Docker network)
+      - 'OPENAI_API_BASE_URL=http://mock-brain-server:8001/v1'
+      - 'OPENAI_API_KEY=mock-key'
+      - 'WEBUI_SECRET_KEY='
+      - 'CORS_ALLOW_ORIGIN=*'
+      - 'SCARF_NO_ANALYTICS=true'
+      - 'DO_NOT_TRACK=true'
+    depends_on:
+      - mock-brain-server
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: unless-stopped
+
+volumes:
+  open-webui: {}

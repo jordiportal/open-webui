@@ -8,24 +8,32 @@ app.use(express.json());
 const PORT = process.env.PORT || 8001;
 
 // ============================================
-// Mock Models Endpoint
+// Mock Models Endpoint - OpenAI compatible
 // ============================================
+const modelsResponse = {
+  object: 'list',
+  data: [
+    { id: 'brain-chat', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-slides', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-docs', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-code', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-research', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-data', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-files', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-web', object: 'model', created: Date.now(), owned_by: 'brain' },
+    { id: 'brain-image', object: 'model', created: Date.now(), owned_by: 'brain' },
+  ]
+};
+
+// Support both /v1/models and /models (for direct connection verification)
 app.get('/v1/models', (req, res) => {
   console.log('📋 GET /v1/models');
-  res.json({
-    object: 'list',
-    data: [
-      { id: 'brain-chat', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-slides', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-docs', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-code', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-research', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-data', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-files', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-web', object: 'model', created: Date.now(), owned_by: 'brain' },
-      { id: 'brain-image', object: 'model', created: Date.now(), owned_by: 'brain' },
-    ]
-  });
+  res.json(modelsResponse);
+});
+
+app.get('/models', (req, res) => {
+  console.log('📋 GET /models');
+  res.json(modelsResponse);
 });
 
 // ============================================
