@@ -110,13 +110,30 @@
 	async function downloadSlidesPptx() {
 		if (isDownloading) return;
 		
+		// Check if user is authenticated
+		const token = getToken();
+		if (!token) {
+			toast.error($i18n.t('Please log in to download presentations'));
+			return;
+		}
+		
 		isDownloading = true;
 		try {
-			await convertAndDownloadSlides(getToken(), content, title || 'Presentation');
-			toast.success($i18n.t('PPTX downloaded'));
-		} catch (error) {
+			console.log('Starting PPTX download...', { title, contentLength: content?.length });
+			await convertAndDownloadSlides(token, content, title || 'Presentation');
+			toast.success($i18n.t('PPTX downloaded successfully'));
+		} catch (error: any) {
 			console.error('Error downloading PPTX:', error);
-			toast.error($i18n.t('Failed to download PPTX'));
+			// Show more specific error message
+			let errorMessage = $i18n.t('Failed to download PPTX');
+			if (error?.detail) {
+				errorMessage = error.detail;
+			} else if (error?.message) {
+				errorMessage = error.message;
+			} else if (typeof error === 'string') {
+				errorMessage = error;
+			}
+			toast.error(errorMessage);
 		} finally {
 			isDownloading = false;
 		}
