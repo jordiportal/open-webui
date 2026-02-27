@@ -8,7 +8,7 @@
 export interface BrainEvent {
 	type: 'thinking' | 'action' | 'sources' | 'outline' | 'artifact' | 'text' | 'console' | 'error';
 	content?: string;
-	artifact_type?: 'slides' | 'code' | 'html' | 'svg' | 'document';
+	artifact_type?: 'slides' | 'code' | 'html' | 'svg' | 'document' | 'image' | 'spreadsheet' | 'video' | 'website' | 'file';
 	format?: string;
 	title?: string;
 	action?: string;
@@ -18,6 +18,10 @@ export interface BrainEvent {
 	language?: string;
 	output?: string;
 	error?: string;
+	url?: string;
+	artifact_id?: string;
+	mime_type?: string;
+	metadata?: Record<string, any>;
 }
 
 export interface ParsedContent {

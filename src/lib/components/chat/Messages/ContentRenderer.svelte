@@ -224,25 +224,32 @@
 					break;
 				case 'artifact':
 					// Update the Brain artifact store to show in the artifacts panel
-					if (event.content) {
+					if (event.content || event.url) {
+						const artifactContent = event.url
+							? `/api/brain-proxy/${event.url.replace(/^\/api\/v1\//, '')}`
+							: event.content;
+						const artifactFormat = event.url ? 'url' : (event.format || 'html');
+
 						const artifact = {
 							type: event.artifact_type || 'html',
-							content: event.content,
+							content: artifactContent,
 							title: event.title || '',
-							format: event.format || 'html',
+							format: artifactFormat,
 							language: event.language || '',
+							metadata: {
+								...(event.metadata || {}),
+								artifact_id: event.artifact_id,
+								mime_type: event.mime_type,
+							},
 							timestamp: Date.now()
 						};
-						// Store locally so we can reopen it later
 						localArtifact = artifact;
 						brainArtifact.set(artifact);
 						showBrainArtifact.set(true);
 						showArtifacts.set(true);
 						showControls.set(true);
 						
-						// Extract items for activity block (e.g., slides)
-						if (brainActivity && event.artifact_type === 'slides') {
-							// Parse slides from HTML to get count and titles
+						if (brainActivity && event.artifact_type === 'slides' && event.content) {
 							const slideItems = parseSlideItems(event.content);
 							const currentCount = event.slide_count || slideItems.length;
 							const totalSlides = event.total_slides || slideItems.length;
@@ -250,7 +257,7 @@
 							
 							brainActivity = { 
 								...brainActivity, 
-								items: slideItems, // No status per item, just labels
+								items: slideItems,
 								status: isComplete ? 'complete' : 'progress'
 							};
 						} else if (brainActivity) {
@@ -482,18 +489,21 @@
 			class="artifact-card group flex items-center gap-3 w-full mt-3 p-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-purple-300 dark:hover:border-purple-600 transition-all duration-200 text-left"
 			on:click={reopenArtifact}
 		>
-			<div class="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
-				<svg class="w-5 h-5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-					<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-						d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-				</svg>
-			</div>
+			{#if localArtifact.type === 'image' && localArtifact.format === 'url'}
+				<div class="flex-shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-gray-200 dark:bg-gray-700">
+					<img src={localArtifact.content} alt="" class="w-full h-full object-cover" loading="lazy" />
+				</div>
+			{:else}
+				<div class="flex-shrink-0 w-10 h-10 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-lg">
+					{localArtifact.type === 'slides' ? '📑' : localArtifact.type === 'image' ? '🖼️' : localArtifact.type === 'spreadsheet' ? '📊' : localArtifact.type === 'video' ? '🎬' : localArtifact.type === 'terminal' ? '⚡' : '📄'}
+				</div>
+			{/if}
 			<div class="flex-1 min-w-0">
 				<div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-					{localArtifact.title || $i18n.t('Presentation')}
+					{localArtifact.title || $i18n.t('Artifact')}
 				</div>
 				<div class="text-xs text-gray-500 dark:text-gray-400">
-					{localArtifact.type === 'slides' ? $i18n.t('Click to view slides') : $i18n.t('Click to view artifact')}
+					{$i18n.t('Click to view')}
 				</div>
 			</div>
 			<div class="flex-shrink-0 text-gray-400 group-hover:text-purple-500 transition-colors">

@@ -125,6 +125,10 @@ export interface BrainArtifact {
 export const brainArtifact: Writable<BrainArtifact | null> = writable(null);
 export const showBrainArtifact = writable(false);
 
+// Workspace browser
+export const showWorkspaceBrowser = writable(false);
+export const conversationArtifacts: Writable<any[]> = writable([]);
+
 export const embed = writable(null);
 
 export const temporaryChatEnabled = writable(false);

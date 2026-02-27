@@ -12,13 +12,49 @@
 
 	export let artifact: BrainArtifact;
 
-	// Extract metadata with defaults
 	$: metadata = artifact.metadata || {};
 	$: format = artifact.format || 'html';
+	$: isUrlArtifact = format === 'url';
+	$: mimeType = metadata.mime_type || '';
+	$: urlIsImage = isUrlArtifact && (artifact.type === 'image' || mimeType.startsWith('image/'));
+	$: urlIsVideo = isUrlArtifact && (artifact.type === 'video' || mimeType.startsWith('video/'));
 </script>
 
 <div class="artifact-viewer h-full">
-	{#if artifact.type === 'document'}
+	{#if isUrlArtifact}
+		<!-- URL-based artifact: route by mime_type or artifact_type -->
+		{#if urlIsImage}
+			<ImageViewer 
+				content={artifact.content}
+				title={artifact.title}
+				format="url"
+			/>
+		{:else if urlIsVideo}
+			<WebsiteViewer
+				content={artifact.content}
+				title={artifact.title}
+				format="url"
+			/>
+		{:else if artifact.type === 'spreadsheet'}
+			<WebsiteViewer
+				content={artifact.content}
+				title={artifact.title}
+				format="url"
+			/>
+		{:else if artifact.type === 'slides'}
+			<WebsiteViewer
+				content={artifact.content}
+				title={artifact.title}
+				format="url"
+			/>
+		{:else}
+			<WebsiteViewer
+				content={artifact.content}
+				title={artifact.title}
+				format="url"
+			/>
+		{/if}
+	{:else if artifact.type === 'document'}
 		<DocumentViewer 
 			content={artifact.content}
 			title={artifact.title}
@@ -63,7 +99,6 @@
 			format={format === 'base64' ? 'base64' : format === 'gallery' ? 'gallery' : 'url'}
 		/>
 	{:else}
-		<!-- Fallback for unknown types - try to render as document -->
 		<DocumentViewer 
 			content={artifact.content}
 			title={artifact.title}

@@ -12,7 +12,8 @@
 		showControls,
 		artifactContents,
 		brainArtifact,
-		showBrainArtifact
+		showBrainArtifact,
+		showWorkspaceBrowser
 	} from '$lib/stores';
 	import type { BrainArtifact } from '$lib/stores';
 	import { copyToClipboard, createMessagesList } from '$lib/utils';
@@ -24,6 +25,7 @@
 	import ArrowLeft from '../icons/ArrowLeft.svelte';
 	import Download from '../icons/Download.svelte';
 	import { ArtifactViewer } from './Messages/Brain';
+	import ArtifactGallery from './ArtifactGallery.svelte';
 
 	export let overlay = false;
 
@@ -106,13 +108,6 @@
 
 		artifactContents.subscribe((value) => {
 			contents = value;
-			console.log('Artifact contents updated:', contents);
-
-			if (contents.length === 0 && !currentBrainArtifact) {
-				showControls.set(false);
-				showArtifacts.set(false);
-			}
-
 			selectedContentIdx = contents ? contents.length - 1 : 0;
 		});
 
@@ -138,16 +133,50 @@
 >
 	<div class="w-full h-full flex flex-col flex-1 relative">
 		{#if showBrainView && currentBrainArtifact}
-			<!-- Brain Artifact Header - minimal, viewers have their own headers -->
+			<!-- Brain Artifact Header -->
 			<div
-				class="pointer-events-auto z-20 flex justify-end items-center p-1 text-gray-900 dark:text-white"
+				class="pointer-events-auto z-20 flex justify-between items-center px-2 py-1 text-gray-900 dark:text-white"
 			>
+				<div class="flex items-center gap-1">
+					<Tooltip content={$i18n.t('Workspace Files')}>
+						<button
+							class="self-center pointer-events-auto p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+							on:click={() => {
+								showWorkspaceBrowser.set(true);
+								showArtifacts.set(false);
+							}}
+						>
+							<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+								<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+									d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+							</svg>
+						</button>
+					</Tooltip>
+					<span class="text-xs font-medium truncate">{currentBrainArtifact.title || 'Artifact'}</span>
+				</div>
 				<button
 					class="self-center pointer-events-auto p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
 					on:click={() => {
 						dispatch('close');
 						brainArtifact.set(null);
 						showBrainArtifact.set(false);
+						showControls.set(false);
+						showArtifacts.set(false);
+					}}
+				>
+					<XMark className="size-4 text-gray-900 dark:text-white" />
+				</button>
+			</div>
+		{:else if !showBrainView && contents.length === 0}
+			<!-- Empty state header (gallery only) -->
+			<div
+				class="pointer-events-auto z-20 flex justify-between items-center px-2 py-1 text-gray-900 dark:text-white"
+			>
+				<span class="text-xs font-medium px-1.5">{$i18n.t('Artifacts')}</span>
+				<button
+					class="self-center pointer-events-auto p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+					on:click={() => {
+						dispatch('close');
 						showControls.set(false);
 						showArtifacts.set(false);
 					}}
@@ -267,8 +296,8 @@
 
 		<div class="flex-1 w-full h-full">
 			<div class=" h-full flex flex-col">
-				<!-- Brain Artifacts - Use unified ArtifactViewer -->
-				{#if showBrainView && currentBrainArtifact}
+			<!-- Brain Artifacts - Use unified ArtifactViewer -->
+			{#if showBrainView && currentBrainArtifact}
 					<div class="max-w-full w-full h-full">
 						<ArtifactViewer artifact={currentBrainArtifact} />
 					</div>
@@ -295,11 +324,12 @@
 							/>
 						{/if}
 					</div>
-				{:else}
-					<div class="m-auto font-medium text-xs text-gray-900 dark:text-white">
-						{$i18n.t('No HTML, CSS, or JavaScript content found.')}
-					</div>
 				{/if}
+			</div>
+
+			<!-- Artifact history gallery for the current conversation -->
+			<div class="px-3 pb-3">
+				<ArtifactGallery />
 			</div>
 		</div>
 	</div>

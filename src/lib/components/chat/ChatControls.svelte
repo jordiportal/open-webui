@@ -19,7 +19,8 @@
 		settings,
 		showFileNavPath,
 		selectedTerminalId,
-		user
+		user,
+		showWorkspaceBrowser
 	} from '$lib/stores';
 
 	import { uploadFile } from '$lib/apis/files';
@@ -32,6 +33,7 @@
 	import Embeds from './ChatControls/Embeds.svelte';
 	import FileNav from './FileNav.svelte';
 	import Overview from './Overview.svelte';
+	import WorkspaceBrowser from './WorkspaceBrowser.svelte';
 
 	const i18n = getContext('i18n');
 
@@ -250,7 +252,7 @@
 	$: if (paneReady && !chatId) closeHandler();
 
 	// Helper: is a "special" full-screen panel active?
-	$: specialPanel = $showCallOverlay || $showArtifacts || $showEmbeds;
+	$: specialPanel = $showCallOverlay || $showArtifacts || $showEmbeds || $showWorkspaceBrowser;
 </script>
 
 {#if !largeScreen}
@@ -418,6 +420,8 @@
 						</div>
 					{:else if $showEmbeds}
 						<Embeds overlay={dragged} />
+					{:else if $showWorkspaceBrowser}
+						<WorkspaceBrowser />
 					{:else if $showArtifacts}
 						<Artifacts {history} overlay={dragged} />
 					{:else}
