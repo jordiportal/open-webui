@@ -95,11 +95,22 @@ async def brain_proxy(
     oauth_token = await _get_oauth_token(request, user)
 
     headers = {}
+    auth_method = "none"
     if oauth_token:
         headers["Authorization"] = f"Bearer {oauth_token}"
+        auth_method = "oauth"
     elif brain_api_key:
         headers["Authorization"] = f"Bearer {brain_api_key}"
         headers["X-Brain-User-Email"] = getattr(user, "email", "") or ""
+        auth_method = "apikey"
+
+    log.info(
+        f"Brain proxy: {request.method} /{path} | auth={auth_method} "
+        f"| oauth_cookie={'yes' if request.cookies.get('oauth_session_id') else 'no'} "
+        f"| has_oauth_manager={hasattr(request.app.state, 'oauth_manager')} "
+        f"| brain_key={'yes' if brain_api_key else 'no'} "
+        f"| user={getattr(user, 'email', '?')}"
+    )
 
     target_url = f"{brain_url}/api/v1/{path}"
 
@@ -119,6 +130,12 @@ async def brain_proxy(
                     kwargs["headers"]["Content-Type"] = request.headers["content-type"]
 
             async with getattr(session, method)(target_url, **kwargs) as resp:
+                if resp.status in (401, 403):
+                    log.warning(
+                        f"Brain proxy auth failure: {resp.status} for /{path} "
+                        f"| auth_method={auth_method}"
+                    )
+
                 content_type = resp.headers.get("Content-Type", "application/octet-stream")
 
                 if "text/event-stream" in content_type:

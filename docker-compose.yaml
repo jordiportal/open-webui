@@ -16,10 +16,13 @@ services:
     container_name: open-webui
     volumes:
       - open-webui:/app/backend/data
+      - ./backend/open_webui:/app/backend/open_webui
     depends_on:
       - ollama
     ports:
       - ${OPEN_WEBUI_PORT-8080}:8080
+    env_file:
+      - .env
     environment:
       - 'OLLAMA_BASE_URL=http://ollama:11434'
       - 'WEBUI_SECRET_KEY='

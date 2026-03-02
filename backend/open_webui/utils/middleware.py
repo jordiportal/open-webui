@@ -6,6 +6,7 @@ import base64
 import textwrap
 
 import asyncio
+import aiohttp
 from aiocache import cached
 from typing import Any, Optional
 import random
@@ -1810,6 +1811,151 @@ async def chat_image_generation_handler(
     return form_data
 
 
+def is_brain_model(request, model) -> bool:
+    """Detect if the active model belongs to a Brain API connection."""
+    url_idx = model.get("urlIdx")
+    if url_idx is None:
+        return False
+    keys = getattr(request.app.state.config, "OPENAI_API_KEYS", [])
+    if url_idx >= len(keys):
+        return False
+    return keys[url_idx].startswith("sk-brain")
+
+
+def _get_brain_connection_from_state(request) -> tuple:
+    """Resolve Brain API base URL and API key from configured OpenAI connections."""
+    urls = getattr(request.app.state.config, "OPENAI_API_BASE_URLS", [])
+    keys = getattr(request.app.state.config, "OPENAI_API_KEYS", [])
+    for i, key in enumerate(keys):
+        if key.startswith("sk-brain") and i < len(urls):
+            url = urls[i].rstrip("/")
+            if url.endswith("/v1"):
+                url = url[:-3]
+            return url, key
+    return None, None
+
+
+async def upload_files_to_brain(
+    request, metadata: dict, user, extra_params: dict
+) -> list[dict]:
+    """
+    Upload chat-attached files to Brain's sandbox workspace.
+    Returns a list of dicts with name, path, content_type, size for each uploaded file.
+    """
+    from open_webui.models.files import Files
+    from open_webui.storage.provider import Storage
+
+    files = metadata.get("files", [])
+    if not files:
+        return []
+
+    brain_url, brain_api_key = _get_brain_connection_from_state(request)
+    if not brain_url:
+        log.warning("Brain upload: no Brain connection configured")
+        return []
+
+    oauth_token = extra_params.get("__oauth_token__")
+    if isinstance(oauth_token, dict):
+        oauth_token = oauth_token.get("access_token")
+
+    headers = {}
+    if oauth_token:
+        headers["Authorization"] = f"Bearer {oauth_token}"
+    elif brain_api_key:
+        headers["Authorization"] = f"Bearer {brain_api_key}"
+        headers["X-Brain-User-Email"] = getattr(user, "email", "") or ""
+
+    uploaded = []
+    timeout = aiohttp.ClientTimeout(total=120)
+
+    async with aiohttp.ClientSession(timeout=timeout) as session:
+        for item in files:
+            file_id = item.get("id")
+            if not file_id:
+                continue
+
+            file_record = Files.get_file_by_id(file_id)
+            if not file_record:
+                log.warning(f"Brain upload: file {file_id} not found in DB")
+                continue
+
+            file_name = file_record.meta.get("name", file_record.filename) if file_record.meta else file_record.filename
+            content_type = (file_record.meta or {}).get("content_type", "application/octet-stream")
+            file_size = (file_record.meta or {}).get("size", 0)
+
+            try:
+                local_path = Storage.get_file(file_record.path)
+                with open(local_path, "rb") as f:
+                    file_bytes = f.read()
+            except Exception as e:
+                log.warning(f"Brain upload: could not read file {file_id}: {e}")
+                continue
+
+            target_url = f"{brain_url}/api/v1/workspace/files/upload"
+            form_data_upload = aiohttp.FormData()
+            form_data_upload.add_field(
+                "file",
+                file_bytes,
+                filename=file_name,
+                content_type=content_type,
+            )
+            form_data_upload.add_field("path", "uploads")
+
+            try:
+                async with session.post(target_url, headers=headers, data=form_data_upload) as resp:
+                    if resp.status == 200:
+                        result = await resp.json()
+                        uploaded.append({
+                            "name": file_name,
+                            "path": result.get("path", f"/workspace/uploads/{file_name}"),
+                            "content_type": content_type,
+                            "size": file_size,
+                        })
+                        log.info(f"Brain upload: uploaded {file_name} -> {result.get('path')}")
+                    else:
+                        body_text = await resp.text()
+                        log.warning(f"Brain upload: failed for {file_name}: {resp.status} {body_text[:200]}")
+            except Exception as e:
+                log.warning(f"Brain upload: error uploading {file_name}: {e}")
+
+    return uploaded
+
+
+def inject_brain_file_context(form_data: dict, uploaded_files: list[dict]) -> None:
+    """Inject XML-formatted file paths into the last user message."""
+    if not uploaded_files:
+        return
+
+    lines = ["<attached_files>"]
+    for f in uploaded_files:
+        size_str = f"{f['size']}" if isinstance(f.get("size"), int) and f["size"] > 0 else "unknown"
+        if isinstance(f.get("size"), int) and f["size"] > 0:
+            if f["size"] >= 1_000_000:
+                size_str = f"{f['size'] / 1_000_000:.1f}MB"
+            elif f["size"] >= 1_000:
+                size_str = f"{f['size'] / 1_000:.0f}KB"
+            else:
+                size_str = f"{f['size']}B"
+        lines.append(
+            f'<file name="{f["name"]}" path="{f["path"]}" '
+            f'content_type="{f["content_type"]}" size="{size_str}"/>'
+        )
+    lines.append("</attached_files>\n")
+    file_context = "\n".join(lines)
+
+    messages = form_data.get("messages", [])
+    for msg in reversed(messages):
+        if msg.get("role") == "user":
+            content = msg.get("content")
+            if isinstance(content, list):
+                msg["content"] = [{"type": "text", "text": file_context}] + content
+            elif isinstance(content, str):
+                msg["content"] = file_context + content
+            else:
+                msg["content"] = file_context
+            break
+
+
 async def chat_completion_files_handler(
     request: Request, body: dict, extra_params: dict, user: UserModel
 ) -> tuple[dict, dict[str, list]]:
@@ -2583,8 +2729,6 @@ async def process_chat_payload(request, form_data, user, metadata, model):
         if mcp_clients:
             metadata["mcp_clients"] = mcp_clients
 
-        # Inject builtin tools for native function calling based on enabled features and model capability
-        # Check if builtin_tools capability is enabled for this model (defaults to True if not specified)
         builtin_tools_enabled = (
             model.get("info", {}).get("meta", {}).get("capabilities") or {}
         ).get("builtin_tools", True)
@@ -2592,7 +2736,6 @@ async def process_chat_payload(request, form_data, user, metadata, model):
             metadata.get("params", {}).get("function_calling") == "native"
             and builtin_tools_enabled
         ):
-            # Add file context to user messages
             chat_id = metadata.get("chat_id")
             form_data["messages"] = add_file_context(
                 form_data.get("messages", []), chat_id, user
@@ -2615,14 +2758,12 @@ async def process_chat_payload(request, form_data, user, metadata, model):
 
         if tools_dict:
             if metadata.get("params", {}).get("function_calling") == "native":
-                # If the function calling is native, then call the tools function calling handler
                 metadata["tools"] = tools_dict
                 form_data["tools"] = [
                     {"type": "function", "function": tool.get("spec", {})}
                     for tool in tools_dict.values()
                 ]
             else:
-                # If the function calling is not native, then call the tools function calling handler
                 try:
                     form_data, flags = await chat_completion_tools_handler(
                         request, form_data, extra_params, user, models, tools_dict
@@ -2631,19 +2772,27 @@ async def process_chat_payload(request, form_data, user, metadata, model):
                 except Exception as e:
                     log.exception(e)
 
-    # Check if file context extraction is enabled for this model (default True)
-    file_context_enabled = (
-        model.get("info", {}).get("meta", {}).get("capabilities") or {}
-    ).get("file_context", True)
-
-    if file_context_enabled:
+    if is_brain_model(request, model):
         try:
-            form_data, flags = await chat_completion_files_handler(
-                request, form_data, extra_params, user
-            )
-            sources.extend(flags.get("sources", []))
+            uploaded = await upload_files_to_brain(request, metadata, user, extra_params)
+            if uploaded:
+                inject_brain_file_context(form_data, uploaded)
+                log.info(f"Brain file upload: {len(uploaded)} files sent to sandbox")
         except Exception as e:
-            log.exception(e)
+            log.exception(f"Brain file upload error: {e}")
+    else:
+        file_context_enabled = (
+            model.get("info", {}).get("meta", {}).get("capabilities") or {}
+        ).get("file_context", True)
+
+        if file_context_enabled:
+            try:
+                form_data, flags = await chat_completion_files_handler(
+                    request, form_data, extra_params, user
+                )
+                sources.extend(flags.get("sources", []))
+            except Exception as e:
+                log.exception(e)
 
     # If context is not empty, insert it into the messages
     if sources and prompt:
