@@ -17,6 +17,7 @@ export { default as TerminalViewer } from './viewers/TerminalViewer.svelte';
 export { default as FilesViewer } from './viewers/FilesViewer.svelte';
 export { default as WebsiteViewer } from './viewers/WebsiteViewer.svelte';
 export { default as ImageViewer } from './viewers/ImageViewer.svelte';
+export { default as OnlyOfficeViewer } from './viewers/OnlyOfficeViewer.svelte';
 
 // Shared components
 export { default as ViewerHeader } from './shared/ViewerHeader.svelte';

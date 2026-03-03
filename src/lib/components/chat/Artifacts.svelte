@@ -125,6 +125,12 @@
 
 	// Check if we should show Brain artifact view
 	$: showBrainView = currentBrainArtifact !== null;
+
+	// When artifacts panel opens with nothing to show, redirect to workspace browser
+	$: if ($showArtifacts && !showBrainView && !$brainArtifact && contents.length === 0) {
+		showWorkspaceBrowser.set(true);
+		showArtifacts.set(false);
+	}
 </script>
 
 <div

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { BrainArtifact } from '$lib/stores';
+	import { isOfficeFile } from '$lib/apis/brain';
 	
 	// Import all viewers
 	import DocumentViewer from './viewers/DocumentViewer.svelte';
@@ -9,6 +10,7 @@
 	import FilesViewer from './viewers/FilesViewer.svelte';
 	import WebsiteViewer from './viewers/WebsiteViewer.svelte';
 	import ImageViewer from './viewers/ImageViewer.svelte';
+	import OnlyOfficeViewer from './viewers/OnlyOfficeViewer.svelte';
 
 	export let artifact: BrainArtifact;
 
@@ -18,12 +20,26 @@
 	$: mimeType = metadata.mime_type || '';
 	$: urlIsImage = isUrlArtifact && (artifact.type === 'image' || mimeType.startsWith('image/'));
 	$: urlIsVideo = isUrlArtifact && (artifact.type === 'video' || mimeType.startsWith('video/'));
+	$: urlIsOffice = isUrlArtifact && isOfficeFile(artifact.title || '');
+	$: officeFilePath = urlIsOffice ? extractFilePath(artifact.content) : '';
+
+	function extractFilePath(url: string): string {
+		const prefix = '/api/brain-proxy/workspace/files/';
+		const idx = url.indexOf(prefix);
+		if (idx >= 0) return url.slice(idx + prefix.length);
+		return url.replace(/^.*\/workspace\/files\//, '');
+	}
 </script>
 
 <div class="artifact-viewer h-full">
 	{#if isUrlArtifact}
 		<!-- URL-based artifact: route by mime_type or artifact_type -->
-		{#if urlIsImage}
+		{#if urlIsOffice}
+			<OnlyOfficeViewer
+				filePath={officeFilePath}
+				title={artifact.title || ''}
+			/>
+		{:else if urlIsImage}
 			<ImageViewer 
 				content={artifact.content}
 				title={artifact.title}

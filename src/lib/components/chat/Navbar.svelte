@@ -5,6 +5,7 @@
 	import {
 		WEBUI_NAME,
 		banners,
+		brainArtifact,
 		chatId,
 		config,
 		mobile,
@@ -14,6 +15,7 @@
 		showSidebar,
 		showArtifacts,
 		showBrainArtifact,
+		showWorkspaceBrowser,
 		temporaryChatEnabled,
 		user
 	} from '$lib/stores';
@@ -221,9 +223,15 @@
 							class:text-purple-500={$showBrainArtifact}
 							class:dark:text-purple-400={$showBrainArtifact}
 							on:click={async () => {
-								showBrainArtifact.set(true);
-								showArtifacts.set(true);
 								showControls.set(true);
+								if ($brainArtifact) {
+									showBrainArtifact.set(true);
+									showArtifacts.set(true);
+									showWorkspaceBrowser.set(false);
+								} else {
+									showWorkspaceBrowser.set(true);
+									showArtifacts.set(false);
+								}
 							}}
 							aria-label="Artifacts"
 						>
