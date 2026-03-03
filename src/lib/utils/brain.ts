@@ -6,13 +6,14 @@
  */
 
 export interface BrainEvent {
-	type: 'thinking' | 'action' | 'sources' | 'outline' | 'artifact' | 'text' | 'console' | 'error';
+	type: 'thinking' | 'action' | 'sources' | 'outline' | 'artifact' | 'text' | 'console' | 'error' | 'status';
 	content?: string;
 	artifact_type?: 'slides' | 'code' | 'html' | 'svg' | 'document' | 'image' | 'spreadsheet' | 'video' | 'website' | 'file';
 	format?: string;
 	title?: string;
 	action?: string;
-	status?: 'start' | 'progress' | 'complete' | 'error';
+	action_type?: string;
+	status?: 'start' | 'progress' | 'complete' | 'error' | 'running' | 'completed';
 	sources?: Array<{ title: string; url: string; snippet?: string }>;
 	items?: string[];
 	language?: string;
@@ -22,6 +23,18 @@ export interface BrainEvent {
 	artifact_id?: string;
 	mime_type?: string;
 	metadata?: Record<string, any>;
+	// Delegation fields
+	delegation_id?: string;
+	agent_name?: string;
+	agent_icon?: string;
+	duration_ms?: number;
+	results_summary?: string;
+	// Iteration fields
+	status_type?: string;
+	iteration?: number;
+	max_iterations?: number;
+	description?: string;
+	results_count?: number;
 }
 
 export interface ParsedContent {

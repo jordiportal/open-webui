@@ -5,6 +5,8 @@ export { default as ThinkingBlock } from './ThinkingBlock.svelte';
 export { default as ActionBlock } from './ActionBlock.svelte';
 export { default as SourcesBlock } from './SourcesBlock.svelte';
 export { default as BrainEventRenderer } from './BrainEventRenderer.svelte';
+export { default as StepBlock } from './StepBlock.svelte';
+export { default as InlineStep } from './InlineStep.svelte';
 
 // Main artifact viewer (router)
 export { default as ArtifactViewer } from './ArtifactViewer.svelte';

@@ -21,6 +21,8 @@
 	import ActionBlock from './Brain/ActionBlock.svelte';
 	import SearchBlock from './Brain/SearchBlock.svelte';
 	import ActivityBlock from './Brain/ActivityBlock.svelte';
+	import StepBlock from './Brain/StepBlock.svelte';
+	import InlineStep from './Brain/InlineStep.svelte';
 
 	export let id;
 	export let content;
@@ -61,6 +63,10 @@
 	let brainSearch = null; // { title, status, resultsCount, sources }
 	// Activity state (for artifact generation like slides, images, etc.)
 	let brainActivity = null; // { title, status, icon, items }
+	// Delegation blocks: Map<delegation_id, { title, subtitle, status, icon, badge, durationMs, steps[] }>
+	let brainDelegations = new Map();
+	// Iteration progress
+	let brainIteration = null; // { iteration, maxIterations }
 
 	// Determine if this is a Brain model response
 	$: isBrain = model?.id ? isBrainModel(model.id) : false;
@@ -107,26 +113,51 @@
 		return items;
 	}
 
+	// Granular action labels (Spanish)
+	const actionLabelsMap = {
+		python: 'Ejecutando Python',
+		shell: 'Ejecutando comando',
+		javascript: 'Ejecutando JavaScript',
+		web_search: 'Buscando en la web',
+		web_fetch: 'Obteniendo página web',
+		file_read: 'Leyendo archivo',
+		file_write: 'Escribiendo archivo',
+		code_exec: 'Ejecutando código',
+		search: 'Buscando',
+		read: 'Leyendo archivo',
+		write: 'Escribiendo archivo',
+		slides: 'Generando presentación',
+		image: 'Generando imagen',
+		web: 'Generando página web',
+		files: 'Explorando archivos',
+		data: 'Procesando datos',
+		data_analysis: 'Analizando datos',
+		document: 'Generando documento',
+		planning: 'Planificando',
+		summarizing: 'Resumiendo',
+		delegate: 'Delegando a subagente',
+	};
+
+	// Actions that show as ActivityBlock (artifact generation)
+	const activityActions = ['slides', 'image', 'web', 'files', 'document'];
+
+	function normalizeStatus(s) {
+		if (s === 'running') return 'progress';
+		if (s === 'completed') return 'complete';
+		return s || 'progress';
+	}
+
 	function processBrainEvents(events) {
 		let newThinking = '';
 		brainActions = [];
 		brainSearch = null;
 		brainActivity = null;
-
-		// Actions that show as ActivityBlock (artifact generation)
-		const activityActions = ['slides', 'image', 'web', 'files', 'data', 'document'];
-		
-		// Labels for activity actions (Spanish)
-		const activityLabels = {
-			slides: 'Generando presentación',
-			image: 'Generando imagen',
-			web: 'Generando página web',
-			files: 'Explorando archivos',
-			data: 'Procesando datos',
-			document: 'Generando documento'
-		};
+		const delegMap = new Map();
+		brainIteration = null;
 
 		for (const event of events) {
+			const delegId = event.delegation_id;
+
 			switch (event.type) {
 				case 'thinking':
 					if (event.status === 'start') {
@@ -137,7 +168,6 @@
 					} else if (event.status === 'error') {
 						brainThinkingStatus = 'error';
 					} else if (event.content) {
-						// Accumulate thinking content (handles both streaming and batch)
 						if (newThinking) {
 							newThinking += '\n' + event.content;
 						} else {
@@ -146,73 +176,130 @@
 						brainThinkingStatus = 'progress';
 					}
 					break;
+
+				case 'status':
+					if (event.status_type === 'iteration') {
+						brainIteration = {
+							iteration: event.iteration || 0,
+							maxIterations: event.max_iterations || 0
+						};
+					}
+					break;
+
 				case 'outline':
-					// Treat outline as an informational action
 					brainActions = [...brainActions, {
 						action: 'outline',
 						status: 'complete',
 						content: event.title || 'Estructura del documento'
 					}];
 					break;
-				case 'action':
-					// Handle both 'action' and 'action_type' field names
-					const actionKey = event.action || event.action_type || event.title || 'Processing';
-					const actionStatus = event.status === 'running' ? 'progress' : event.status === 'completed' ? 'complete' : event.status || 'progress';
-					
-					// Handle search actions specially - they will be combined with sources
-					if (actionKey === 'search') {
+
+				case 'action': {
+					const actionKey = event.action_type || event.action || event.title || 'data';
+					const actionStatus = normalizeStatus(event.status);
+					const actionLabel = event.title || actionLabelsMap[actionKey] || actionKey;
+
+					// Delegation events => group into StepBlock
+					if (actionKey === 'delegate' && delegId) {
+						if (!delegMap.has(delegId)) {
+							delegMap.set(delegId, {
+								title: event.agent_name || 'Subagente',
+								subtitle: event.title || '',
+								status: actionStatus,
+								icon: event.agent_icon || 'data',
+								badge: '',
+								durationMs: null,
+								steps: []
+							});
+						}
+						const d = delegMap.get(delegId);
+						d.status = actionStatus;
+						if (event.title) d.subtitle = event.title;
+						if (event.duration_ms != null) d.durationMs = event.duration_ms;
+						if (event.results_summary) d.badge = event.results_summary;
+						if (actionStatus === 'complete') {
+							d.status = 'complete';
+						}
+						break;
+					}
+
+					// If this event belongs to an active delegation, add as inner step
+					if (delegId && delegMap.has(delegId)) {
+						const d = delegMap.get(delegId);
+						// When completing, find the last in-progress step with same label and update it
+						if (actionStatus === 'complete' || actionStatus === 'error') {
+							const lastIdx = d.steps.findLastIndex(s => s.label === actionLabel && s.status === 'progress');
+							if (lastIdx >= 0) {
+								d.steps[lastIdx].status = actionStatus;
+							} else {
+								d.steps.push({ label: actionLabel, status: actionStatus });
+							}
+						} else {
+							d.steps.push({ label: actionLabel, status: actionStatus });
+							d.subtitle = actionLabel;
+						}
+						break;
+					}
+
+					// Search actions => SearchBlock
+					if (actionKey === 'search' || actionKey === 'web_search') {
 						brainSearch = {
-							title: event.title || 'Buscando',
+							title: actionLabel,
 							status: actionStatus,
 							resultsCount: event.results_count || 0,
 							sources: brainSearch?.sources || []
 						};
 						break;
 					}
-					
-					// Handle activity actions (artifact generation)
+
+					// Activity actions => ActivityBlock
 					if (activityActions.includes(actionKey)) {
-						// Preserve existing items when updating activity
 						brainActivity = {
-							title: activityLabels[actionKey] || event.title || 'Procesando',
+							title: actionLabelsMap[actionKey] || actionLabel,
 							status: actionStatus,
 							icon: actionKey,
 							items: brainActivity?.items || []
 						};
 						break;
 					}
-					
+
+					// Regular actions => ActionBlock
 					const newAction = {
 						...event,
 						action: actionKey,
 						status: actionStatus,
 						content: event.content || event.description || ''
 					};
-					
-					// Find existing action with same key and update it, or add new
 					const existingIdx = brainActions.findIndex(a => a.action === actionKey);
 					if (existingIdx >= 0) {
-						// Update existing action
 						brainActions = [
 							...brainActions.slice(0, existingIdx),
 							newAction,
 							...brainActions.slice(existingIdx + 1)
 						];
 					} else {
-						// Add new action
 						brainActions = [...brainActions, newAction];
 					}
 					break;
+				}
+
 				case 'sources':
-					// Combine sources with search action
 					if (event.sources && event.sources.length > 0) {
+						// If sources belong to a delegation, add as step
+						if (delegId && delegMap.has(delegId)) {
+							const d = delegMap.get(delegId);
+							d.steps.push({
+								label: `${event.sources.length} fuentes encontradas`,
+								status: 'complete'
+							});
+							break;
+						}
 						if (brainSearch) {
 							brainSearch = {
 								...brainSearch,
 								sources: event.sources
 							};
 						} else {
-							// Create search block if sources arrive before action
 							brainSearch = {
 								title: 'Búsqueda',
 								status: 'complete',
@@ -222,8 +309,8 @@
 						}
 					}
 					break;
+
 				case 'artifact':
-					// Update the Brain artifact store to show in the artifacts panel
 					if (event.content || event.url) {
 						const artifactContent = event.url
 							? `/api/brain-proxy/${event.url.replace(/^\/api\/v1\//, '')}`
@@ -248,15 +335,14 @@
 						showBrainArtifact.set(true);
 						showArtifacts.set(true);
 						showControls.set(true);
-						
+
 						if (brainActivity && event.artifact_type === 'slides' && event.content) {
 							const slideItems = parseSlideItems(event.content);
 							const currentCount = event.slide_count || slideItems.length;
 							const totalSlides = event.total_slides || slideItems.length;
 							const isComplete = currentCount >= totalSlides;
-							
-							brainActivity = { 
-								...brainActivity, 
+							brainActivity = {
+								...brainActivity,
 								items: slideItems,
 								status: isComplete ? 'complete' : 'progress'
 							};
@@ -267,7 +353,9 @@
 					break;
 			}
 		}
+
 		brainThinking = newThinking;
+		brainDelegations = delegMap;
 	}
 
 	// Get clean content for Markdown (without Brain event markers)
@@ -374,7 +462,7 @@
 </script>
 
 <div bind:this={contentContainerElement}>
-	<!-- Brain Events (Thinking, Search, Activity, Actions) -->
+	<!-- Brain Events (Thinking, Search, Delegations, Activity, Actions) -->
 	{#if isBrain}
 		{#if brainThinking}
 			<ThinkingBlock
@@ -393,6 +481,23 @@
 				collapsed={done}
 			/>
 		{/if}
+
+		<!-- Delegation blocks (Cursor-style double-line collapsible) -->
+		{#each [...brainDelegations.entries()] as [delegId, deleg] (delegId)}
+			<StepBlock
+				title={deleg.title}
+				subtitle={deleg.subtitle}
+				status={deleg.status}
+				icon={deleg.icon}
+				badge={deleg.badge}
+				durationMs={deleg.durationMs}
+				collapsed={done && deleg.status === 'complete'}
+			>
+				{#each deleg.steps as step}
+					<InlineStep label={step.label} status={step.status} />
+				{/each}
+			</StepBlock>
+		{/each}
 
 		{#if brainActivity}
 			<ActivityBlock
