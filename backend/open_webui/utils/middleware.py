@@ -2976,8 +2976,10 @@ async def background_tasks_handler(ctx):
         if message:
             message["model"] = form_data.get("model")
 
+    _brain_backend = os.environ.get("BRAIN_CHAT_BACKEND", "").lower() == "true"
+
     if message and "model" in message:
-        if tasks and messages:
+        if tasks and messages and not _brain_backend:
             if (
                 TASKS.FOLLOW_UP_GENERATION in tasks
                 and tasks[TASKS.FOLLOW_UP_GENERATION]

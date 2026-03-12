@@ -1714,4 +1714,11 @@ class ChatTable:
             return [ChatModel.model_validate(chat) for chat in all_chats]
 
 
-Chats = ChatTable()
+import os as _os
+
+if _os.environ.get("BRAIN_CHAT_BACKEND", "").lower() == "true":
+    from open_webui.models.brain_chats import BrainChatAdapter
+    Chats = BrainChatAdapter()
+    log.info("Using BrainChatAdapter for chat storage (BRAIN_CHAT_BACKEND=true)")
+else:
+    Chats = ChatTable()

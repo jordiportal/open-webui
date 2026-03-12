@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 from typing import Optional
 from urllib.parse import urlparse
 
@@ -952,6 +953,17 @@ async def generate_chat_completion(
 
     payload = {**form_data}
     metadata = payload.pop("metadata", None)
+
+    _brain_backend = os.environ.get("BRAIN_CHAT_BACKEND", "").lower() == "true"
+    if _brain_backend and metadata:
+        if metadata.get("chat_id"):
+            payload["chat_id"] = metadata["chat_id"]
+        _email_map = dict(
+            pair.split(":")
+            for pair in os.environ.get("BRAIN_USER_EMAIL_MAP", "").split(",")
+            if ":" in pair
+        )
+        payload["user"] = _email_map.get(user.email, user.email)
 
     model_id = form_data.get("model")
     model_info = Models.get_model_by_id(model_id)
