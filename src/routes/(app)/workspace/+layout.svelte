@@ -132,18 +132,29 @@
 							</a>
 						{/if}
 
-						{#if $user?.role === 'admin' || $user?.permissions?.workspace?.tools}
-							<a
-								draggable="false"
-								aria-current={$page.url.pathname.includes('/workspace/tools') ? 'page' : null}
-								class="min-w-fit p-1.5 {$page.url.pathname.includes('/workspace/tools')
-									? ''
-									: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
-								href="/workspace/tools"
-							>
-								{$i18n.t('Tools')}
-							</a>
-						{/if}
+					{#if $user?.role === 'admin' || $user?.permissions?.workspace?.tools}
+						<a
+							draggable="false"
+							aria-current={$page.url.pathname.includes('/workspace/tools') ? 'page' : null}
+							class="min-w-fit p-1.5 {$page.url.pathname.includes('/workspace/tools')
+								? ''
+								: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
+							href="/workspace/tools"
+						>
+							{$i18n.t('Tools')}
+						</a>
+					{/if}
+
+					<a
+						draggable="false"
+						aria-current={$page.url.pathname.includes('/workspace/sandboxes') ? 'page' : null}
+						class="min-w-fit p-1.5 {$page.url.pathname.includes('/workspace/sandboxes')
+							? ''
+							: 'text-gray-300 dark:text-gray-600 hover:text-gray-700 dark:hover:text-white'} transition select-none"
+						href="/workspace/sandboxes"
+					>
+						{$i18n.t('Sandboxes')}
+					</a>
 					</div>
 				</div>
 
