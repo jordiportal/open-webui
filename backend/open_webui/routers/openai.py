@@ -171,7 +171,22 @@ async def get_headers_and_cookies(
             log.error(f"Error getting OAuth token: {e}")
 
         if oauth_token:
-            token = f"{oauth_token.get('access_token', '')}"
+            access_token = oauth_token.get("access_token", "")
+            if access_token:
+                token = access_token
+            else:
+                log.warning(
+                    f"system_oauth: empty access_token, falling back to API key"
+                )
+
+        if not token and key:
+            log.info(
+                f"system_oauth: OAuth token unavailable, using API key fallback"
+                f" | user={user.email if user else '?'}"
+            )
+            token = f"{key}"
+            if user:
+                headers["X-Brain-User-Email"] = getattr(user, "email", "") or ""
 
     elif auth_type in ("azure_ad", "microsoft_entra_id"):
         token = get_microsoft_entra_id_access_token()
