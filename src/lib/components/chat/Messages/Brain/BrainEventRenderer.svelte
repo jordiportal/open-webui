@@ -8,6 +8,7 @@
 	import ThinkingBlock from './ThinkingBlock.svelte';
 	import ActionBlock from './ActionBlock.svelte';
 	import SourcesBlock from './SourcesBlock.svelte';
+	import TaskPlanBlock from './TaskPlanBlock.svelte';
 
 	const i18n = getContext<Writable<i18nType>>('i18n');
 	const dispatch = createEventDispatcher();
@@ -22,6 +23,9 @@
 	let actions: BrainEvent[] = [];
 	let sources: BrainEvent[] = [];
 	let artifact: BrainEvent | null = null;
+	let taskPlanGoal: string = '';
+	let taskPlanSteps: Array<{ index: number; description: string; status: string }> = [];
+	let hasTaskPlan: boolean = false;
 
 	// Parse content when it changes
 	$: if (content) {
@@ -64,6 +68,22 @@
 				case 'artifact':
 					artifact = event;
 					dispatch('artifact', event);
+					break;
+				case 'task_plan':
+					if (event.goal && event.steps) {
+						taskPlanGoal = event.goal;
+						taskPlanSteps = event.steps.map((s) => ({ ...s }));
+						hasTaskPlan = true;
+					}
+					break;
+				case 'task_plan_update':
+					if (hasTaskPlan && event.step_index !== undefined) {
+						taskPlanSteps = taskPlanSteps.map((s) =>
+							s.index === event.step_index
+								? { ...s, status: event.status || s.status }
+								: s
+						);
+					}
 					break;
 			}
 		}
@@ -109,6 +129,15 @@
 					<SourcesBlock sources={sourceEvent.sources} />
 				{/if}
 			{/each}
+		{/if}
+
+		<!-- Task Plan -->
+		{#if hasTaskPlan}
+			<TaskPlanBlock
+				goal={taskPlanGoal}
+				steps={taskPlanSteps}
+				{done}
+			/>
 		{/if}
 	</div>
 {/if}

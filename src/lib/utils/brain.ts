@@ -6,7 +6,7 @@
  */
 
 export interface BrainEvent {
-	type: 'thinking' | 'action' | 'sources' | 'outline' | 'artifact' | 'text' | 'console' | 'error' | 'status';
+	type: 'thinking' | 'action' | 'sources' | 'outline' | 'artifact' | 'text' | 'console' | 'error' | 'status' | 'task_plan' | 'task_plan_update';
 	content?: string;
 	artifact_type?: 'slides' | 'code' | 'html' | 'svg' | 'document' | 'image' | 'spreadsheet' | 'video' | 'website' | 'file';
 	format?: string;
@@ -35,6 +35,12 @@ export interface BrainEvent {
 	max_iterations?: number;
 	description?: string;
 	results_count?: number;
+	// Task plan fields
+	plan_id?: string;
+	goal?: string;
+	steps?: Array<{ index: number; description: string; status: string }>;
+	step_index?: number;
+	result_summary?: string;
 }
 
 export interface ParsedContent {
