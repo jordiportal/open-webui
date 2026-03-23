@@ -127,6 +127,8 @@ async def get_headers_and_cookies(
     config=None,
     metadata: Optional[dict] = None,
     user: UserModel = None,
+    force_oauth_refresh: bool = False,
+    force_api_key_fallback: bool = False,
 ):
     cookies = {}
     headers = {
@@ -160,24 +162,28 @@ async def get_headers_and_cookies(
     elif auth_type == "system_oauth":
         cookies = request.cookies
 
-        oauth_token = None
-        try:
-            if request.cookies.get("oauth_session_id", None):
-                oauth_token = await request.app.state.oauth_manager.get_oauth_token(
-                    user.id,
-                    request.cookies.get("oauth_session_id", None),
-                )
-        except Exception as e:
-            log.error(f"Error getting OAuth token: {e}")
+        if force_api_key_fallback:
+            token = None
+        else:
+            oauth_token = None
+            try:
+                if request.cookies.get("oauth_session_id", None):
+                    oauth_token = await request.app.state.oauth_manager.get_oauth_token(
+                        user.id,
+                        request.cookies.get("oauth_session_id", None),
+                        force_refresh=force_oauth_refresh,
+                    )
+            except Exception as e:
+                log.error(f"Error getting OAuth token: {e}")
 
-        if oauth_token:
-            access_token = oauth_token.get("access_token", "")
-            if access_token:
-                token = access_token
-            else:
-                log.warning(
-                    f"system_oauth: empty access_token, falling back to API key"
-                )
+            if oauth_token:
+                access_token = oauth_token.get("access_token", "")
+                if access_token:
+                    token = access_token
+                else:
+                    log.warning(
+                        f"system_oauth: empty access_token, falling back to API key"
+                    )
 
         if not token and key:
             log.info(
@@ -1123,6 +1129,8 @@ async def generate_chat_completion(
     streaming = False
     response = None
 
+    auth_type = api_config.get("auth_type")
+
     try:
         session = aiohttp.ClientSession(
             trust_env=True, timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT)
@@ -1136,6 +1144,46 @@ async def generate_chat_completion(
             cookies=cookies,
             ssl=AIOHTTP_CLIENT_SESSION_SSL,
         )
+
+        if r.status == 401 and auth_type == "system_oauth":
+            await cleanup_response(r, session)
+            log.info("system_oauth: 401 received, attempting force refresh")
+            headers, cookies = await get_headers_and_cookies(
+                request, url, key, api_config, metadata, user=user,
+                force_oauth_refresh=True,
+            )
+            session = aiohttp.ClientSession(
+                trust_env=True,
+                timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
+            )
+            r = await session.request(
+                method="POST",
+                url=request_url,
+                data=payload,
+                headers=headers,
+                cookies=cookies,
+                ssl=AIOHTTP_CLIENT_SESSION_SSL,
+            )
+
+            if r.status == 401:
+                await cleanup_response(r, session)
+                log.info("system_oauth: refresh retry failed, falling back to API key")
+                headers, cookies = await get_headers_and_cookies(
+                    request, url, key, api_config, metadata, user=user,
+                    force_api_key_fallback=True,
+                )
+                session = aiohttp.ClientSession(
+                    trust_env=True,
+                    timeout=aiohttp.ClientTimeout(total=AIOHTTP_CLIENT_TIMEOUT),
+                )
+                r = await session.request(
+                    method="POST",
+                    url=request_url,
+                    data=payload,
+                    headers=headers,
+                    cookies=cookies,
+                    ssl=AIOHTTP_CLIENT_SESSION_SSL,
+                )
 
         # Check if response is SSE
         if "text/event-stream" in r.headers.get("Content-Type", ""):
