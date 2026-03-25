@@ -223,7 +223,8 @@ export async function getOnlyOfficeConfig(
 const OFFICE_EXTENSIONS = new Set([
 	'docx', 'doc', 'odt', 'rtf',
 	'xlsx', 'xls', 'csv', 'ods',
-	'pptx', 'ppt', 'ppsx', 'odp'
+	'pptx', 'ppt', 'ppsx', 'odp',
+	'pdf'
 ]);
 
 export function isOfficeFile(filename: string): boolean {
