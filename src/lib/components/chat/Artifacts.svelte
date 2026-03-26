@@ -15,7 +15,7 @@
 		showBrainArtifact,
 		showWorkspaceBrowser
 	} from '$lib/stores';
-	import type { BrainArtifact } from '$lib/stores';
+	import type { Artifact } from '$lib/stores';
 	import { copyToClipboard, createMessagesList } from '$lib/utils';
 
 	import XMark from '../icons/XMark.svelte';
@@ -36,7 +36,7 @@
 	let iframeElement: HTMLIFrameElement;
 
 	// Brain artifact state
-	let currentBrainArtifact: BrainArtifact | null = null;
+	let currentBrainArtifact: Artifact | null = null;
 
 	function navigateContent(direction: 'prev' | 'next') {
 		selectedContentIdx =
@@ -158,7 +158,7 @@
 							</svg>
 						</button>
 					</Tooltip>
-					<span class="text-xs font-medium truncate">{currentBrainArtifact.title || 'Artifact'}</span>
+					<span class="text-xs font-medium truncate">{currentBrainArtifact.name || 'Artifact'}</span>
 				</div>
 				<button
 					class="self-center pointer-events-auto p-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"

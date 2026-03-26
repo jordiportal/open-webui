@@ -113,12 +113,15 @@
 
 		const url = getWorkspaceFileUrl(fp);
 
+		const mime = getMimeType(ext);
 		brainArtifact.set({
-			type: artifactType as any,
-			content: url,
-			title: file.name,
-			format: 'url',
-			metadata: { mime_type: getMimeType(ext), file_size: file.size }
+			artifact_id: `ws_${Date.now()}`,
+			name: file.name,
+			parts: [{
+				kind: 'file' as const,
+				file: { uri: url, name: file.name, mime_type: mime }
+			}],
+			metadata: { file_size: file.size }
 		});
 		showWorkspaceBrowser.set(false);
 		showBrainArtifact.set(true);

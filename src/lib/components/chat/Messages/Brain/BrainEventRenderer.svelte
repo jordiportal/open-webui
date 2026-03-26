@@ -66,8 +66,7 @@
 					sources = [...sources, event];
 					break;
 				case 'artifact':
-					artifact = event;
-					dispatch('artifact', event);
+					// Artifacts now arrive via SSE named events; no-op for legacy markers
 					break;
 				case 'task_plan':
 					if (event.goal && event.steps) {

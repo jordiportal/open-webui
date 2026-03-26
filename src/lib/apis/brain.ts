@@ -20,20 +20,22 @@ export interface WorkspaceListResponse {
 }
 
 export interface BrainArtifactResponse {
-	id: number;
 	artifact_id: string;
-	type: string;
-	title: string | null;
+	name: string | null;
 	description: string | null;
-	file_name: string;
-	file_path: string;
-	mime_type: string | null;
-	file_size: number | null;
+	parts: Array<{
+		kind: string;
+		text?: string;
+		file?: { uri?: string; bytes?: string; name?: string; mime_type?: string };
+		data?: Record<string, any>;
+		metadata?: Record<string, any>;
+	}>;
+	metadata: Record<string, any>;
+	source: string | null;
 	conversation_id: string | null;
 	agent_id: string | null;
-	source: string;
-	metadata: Record<string, any>;
-	status: string;
+	task_id: string | null;
+	created_by: string | null;
 	created_at: string;
 	updated_at: string;
 }

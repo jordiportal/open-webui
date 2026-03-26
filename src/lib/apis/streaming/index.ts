@@ -10,6 +10,8 @@ type TextStreamUpdate = {
 	selectedModelId?: any;
 	error?: any;
 	usage?: ResponseUsage;
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	artifact?: any;
 };
 
 type ResponseUsage = {
@@ -52,6 +54,18 @@ async function* openAIStreamToIterator(
 		if (!value) {
 			continue;
 		}
+
+		// Handle SSE named events (e.g. brain.artifact)
+		if (value.event === 'brain.artifact') {
+			try {
+				const artifactData = JSON.parse(value.data);
+				yield { done: false, value: '', artifact: artifactData.artifact ?? artifactData };
+			} catch (e) {
+				console.warn('Failed to parse brain.artifact event:', e);
+			}
+			continue;
+		}
+
 		const data = value.data;
 		if (data.startsWith('[DONE]')) {
 			yield { done: true, value: '' };
@@ -116,6 +130,10 @@ async function* streamLargeDeltasAsRandomChunks(
 			continue;
 		}
 		if (textStreamUpdate.usage) {
+			yield textStreamUpdate;
+			continue;
+		}
+		if (textStreamUpdate.artifact) {
 			yield textStreamUpdate;
 			continue;
 		}

@@ -36,6 +36,8 @@
 		chatTitle,
 		showArtifacts,
 		artifactContents,
+		brainArtifact,
+		showBrainArtifact,
 		tools,
 		toolServers,
 		terminalServers,
@@ -471,6 +473,15 @@
 					chatTitle.set(data);
 					currentChatPage.set(1);
 					await chats.set(await getChatList(localStorage.token, $currentChatPage));
+				} else if (type === 'chat:brain.artifact') {
+					// A2A-aligned artifact from Brain SSE named event
+					const artifactData = data?.artifact ?? data;
+					if (artifactData) {
+						brainArtifact.set(artifactData);
+						showBrainArtifact.set(true);
+						showArtifacts.set(true);
+						showControls.set(true);
+					}
 				} else if (type === 'chat:tags') {
 					chat = await getChatById(localStorage.token, $chatId);
 					allTags.set(await getAllTags(localStorage.token));
@@ -2454,11 +2465,19 @@
 					Boolean($settings?.splitLargeChunks ?? false)
 				);
 				for await (const update of textStream) {
-					const { value, done, sources, error, usage } = update;
+					const { value, done, sources, error, usage, artifact } = update;
 					if (error || done) {
 						generating = false;
 						generationController = null;
 						break;
+					}
+
+					if (artifact) {
+						brainArtifact.set(artifact);
+						showBrainArtifact.set(true);
+						showArtifacts.set(true);
+						showControls.set(true);
+						continue;
 					}
 
 					if (mergedResponse.content == '' && value == '\n') {

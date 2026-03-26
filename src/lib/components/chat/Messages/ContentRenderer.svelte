@@ -311,45 +311,10 @@
 					break;
 
 				case 'artifact':
-					if (event.content || event.url) {
-						const artifactContent = event.url
-							? `/api/brain-proxy/${event.url.replace(/^\/api\/v1\//, '')}`
-							: event.content;
-						const artifactFormat = event.url ? 'url' : (event.format || 'html');
-
-						const artifact = {
-							type: event.artifact_type || 'html',
-							content: artifactContent,
-							title: event.title || '',
-							format: artifactFormat,
-							language: event.language || '',
-							metadata: {
-								...(event.metadata || {}),
-								artifact_id: event.artifact_id,
-								mime_type: event.mime_type,
-							},
-							timestamp: Date.now()
-						};
-						localArtifact = artifact;
-						brainArtifact.set(artifact);
-						showBrainArtifact.set(true);
-						showArtifacts.set(true);
-						showControls.set(true);
-
-						if (brainActivity && event.artifact_type === 'slides' && event.content) {
-							const slideItems = parseSlideItems(event.content);
-							const currentCount = event.slide_count || slideItems.length;
-							const totalSlides = event.total_slides || slideItems.length;
-							const isComplete = currentCount >= totalSlides;
-							brainActivity = {
-								...brainActivity,
-								items: slideItems,
-								status: isComplete ? 'complete' : 'progress'
-							};
-						} else if (brainActivity) {
-							brainActivity = { ...brainActivity, status: 'complete' };
-						}
-					}
+					// Artifacts now arrive via SSE named events (brain.artifact),
+					// not as inline markers. This case is kept as a no-op for
+					// backward compat with any cached messages that still contain
+					// the old <!--BRAIN_EVENT:artifact--> markers.
 					break;
 			}
 		}

@@ -14,7 +14,6 @@
 		getConversationArtifacts,
 		getArtifactContentUrl
 	} from '$lib/apis/brain';
-	import type { BrainArtifactResponse } from '$lib/apis/brain';
 
 	const i18n = getContext<Writable<i18nType>>('i18n');
 
@@ -22,7 +21,7 @@
 	let loading = false;
 	let collapsed = true;
 
-	$: artifacts = $conversationArtifacts as BrainArtifactResponse[];
+	$: artifacts = $conversationArtifacts as any[];
 	$: hasArtifacts = artifacts.length > 0;
 
 	onMount(() => {
@@ -47,39 +46,32 @@
 		}
 	}
 
-	function openArtifact(art: BrainArtifactResponse) {
-		const url = getArtifactContentUrl(art.artifact_id);
-		const ext = art.file_name.split('.').pop()?.toLowerCase() || '';
-
-		let type = art.type || 'file';
-		if (['image', 'video', 'presentation', 'spreadsheet', 'document', 'html'].includes(type)) {
-			if (type === 'presentation') type = 'slides';
-		}
-
-		brainArtifact.set({
-			type: type as any,
-			content: url,
-			title: art.title || art.file_name,
-			format: 'url',
-			metadata: {
-				artifact_id: art.artifact_id,
-				mime_type: art.mime_type,
-				file_size: art.file_size,
-				...art.metadata
-			}
-		});
+	function openArtifact(art: any) {
+		// The gallery receives ArtifactResponse objects from the API.
+		// Convert to the A2A Artifact interface the store expects.
+		const a2a = {
+			artifact_id: art.artifact_id,
+			name: art.name || 'Artifact',
+			description: art.description,
+			parts: art.parts || [],
+			metadata: art.metadata || {},
+		};
+		brainArtifact.set(a2a);
 		showBrainArtifact.set(true);
 		showArtifacts.set(true);
 		showControls.set(true);
 	}
 
-	function getTypeIcon(type: string): string {
-		const icons: Record<string, string> = {
-			image: '🖼️', video: '🎬', presentation: '📑', slides: '📑',
-			spreadsheet: '📊', document: '📄', html: '🌐', code: '📜',
-			audio: '🎵', file: '📎'
-		};
-		return icons[type] || '📎';
+	function getMimeIcon(art: any): string {
+		const fp = (art.parts || []).find((p: any) => p.kind === 'file');
+		const mime = fp?.file?.mime_type || '';
+		if (mime.startsWith('image/')) return '🖼️';
+		if (mime.startsWith('video/')) return '🎬';
+		if (/spreadsheet/.test(mime)) return '📊';
+		if (/presentation/.test(mime)) return '📑';
+		if (/wordprocessing/.test(mime)) return '📄';
+		if (mime.startsWith('text/')) return '📝';
+		return '📎';
 	}
 
 	function formatDate(dateStr: string): string {
@@ -117,23 +109,12 @@
 						class="group flex flex-col items-center p-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 hover:bg-gray-100 dark:hover:bg-gray-800 hover:border-purple-300 dark:hover:border-purple-600 transition-all text-left"
 						on:click={() => openArtifact(art)}
 					>
-						{#if art.type === 'image' && art.artifact_id}
-							<div class="w-full h-16 rounded overflow-hidden mb-1.5 bg-gray-200 dark:bg-gray-700">
-								<img
-									src={getArtifactContentUrl(art.artifact_id)}
-									alt={art.title || art.file_name}
-									class="w-full h-full object-cover"
-									loading="lazy"
-								/>
-							</div>
-						{:else}
-							<div class="w-full h-16 rounded flex items-center justify-center mb-1.5 bg-gray-100 dark:bg-gray-800 text-2xl">
-								{getTypeIcon(art.type)}
-							</div>
-						{/if}
+						<div class="w-full h-16 rounded flex items-center justify-center mb-1.5 bg-gray-100 dark:bg-gray-800 text-2xl">
+							{getMimeIcon(art)}
+						</div>
 						<div class="w-full">
 							<div class="text-xs font-medium text-gray-700 dark:text-gray-300 truncate">
-								{art.title || art.file_name}
+								{art.name || art.title || 'Artifact'}
 							</div>
 							<div class="text-[10px] text-gray-400 truncate">
 								{formatDate(art.created_at)}

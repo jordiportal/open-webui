@@ -100,29 +100,31 @@ export const selectedTerminalId: Writable<string | null> = writable(null);
 export const artifactCode = writable(null);
 export const artifactContents = writable(null);
 
-// Brain artifact store - extended artifact support for Brain agents
-export type ArtifactType = 
-	| 'document'     // Markdown/HTML text documents
-	| 'slides'       // Presentations
-	| 'spreadsheet'  // Tables/data (JSON or CSV)
-	| 'terminal'     // Command output
-	| 'files'        // File browser
-	| 'website'      // URL or HTML preview
-	| 'image'        // Single image or gallery
-	| 'console'      // Legacy: console output
-	| 'code'         // Legacy: code preview
-	| 'html';        // Legacy: raw HTML
-
-export interface BrainArtifact {
-	type: ArtifactType;
-	content: string;
-	title?: string;
-	format?: string;           // 'markdown', 'html', 'json', 'csv', 'url', 'base64', etc.
-	language?: string;         // For code: programming language
-	metadata?: Record<string, any>; // Type-specific metadata
-	timestamp?: number;
+// ── A2A-aligned artifact types ──────────────────────────────────
+export interface FileRef {
+	uri?: string;
+	bytes?: string;
+	name?: string;
+	mime_type?: string;
 }
-export const brainArtifact: Writable<BrainArtifact | null> = writable(null);
+
+export interface ArtifactPart {
+	kind: 'text' | 'file' | 'data';
+	text?: string;
+	file?: FileRef;
+	data?: Record<string, any>;
+	metadata?: Record<string, any>;
+}
+
+export interface Artifact {
+	artifact_id: string;
+	name?: string;
+	description?: string;
+	parts: ArtifactPart[];
+	metadata?: Record<string, any>;
+}
+
+export const brainArtifact: Writable<Artifact | null> = writable(null);
 export const showBrainArtifact = writable(false);
 
 // Workspace browser

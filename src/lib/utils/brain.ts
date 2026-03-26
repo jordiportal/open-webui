@@ -137,14 +137,6 @@ export function getActions(events: BrainEvent[]): BrainEvent[] {
 }
 
 /**
- * Get the latest artifact event
- */
-export function getLatestArtifact(events: BrainEvent[]): BrainEvent | null {
-	const artifactEvents = getEventsByType(events, 'artifact');
-	return artifactEvents.length > 0 ? artifactEvents[artifactEvents.length - 1] : null;
-}
-
-/**
  * Get all source events
  */
 export function getSources(events: BrainEvent[]): BrainEvent[] {

@@ -1,8 +1,6 @@
 <script lang="ts">
-	import type { BrainArtifact } from '$lib/stores';
-	import { isOfficeFile } from '$lib/apis/brain';
-	
-	// Import all viewers
+	import type { Artifact, ArtifactPart } from '$lib/stores';
+
 	import DocumentViewer from './viewers/DocumentViewer.svelte';
 	import SlidesViewer from './viewers/SlidesViewer.svelte';
 	import SpreadsheetViewer from './viewers/SpreadsheetViewer.svelte';
@@ -12,112 +10,75 @@
 	import ImageViewer from './viewers/ImageViewer.svelte';
 	import OnlyOfficeViewer from './viewers/OnlyOfficeViewer.svelte';
 
-	export let artifact: BrainArtifact;
+	export let artifact: Artifact;
 
-	$: metadata = artifact.metadata || {};
-	$: format = artifact.format || 'html';
-	$: isUrlArtifact = format === 'url';
-	$: mimeType = metadata.mime_type || '';
-	$: urlIsImage = isUrlArtifact && (artifact.type === 'image' || mimeType.startsWith('image/'));
-	$: urlIsVideo = isUrlArtifact && (artifact.type === 'video' || mimeType.startsWith('video/'));
-	$: urlIsOffice = isUrlArtifact && isOfficeFile(artifact.title || '');
-	$: officeFilePath = urlIsOffice ? extractFilePath(artifact.content) : '';
+	$: primaryPart = artifact.parts?.find((p: ArtifactPart) => p.kind === 'file') || artifact.parts?.[0];
+	$: mimeType = primaryPart?.file?.mime_type || '';
+	$: artMeta = artifact.metadata || {};
 
-	function extractFilePath(url: string): string {
+	$: isOffice = /vnd\.openxmlformats/.test(mimeType);
+	$: isImage = mimeType.startsWith('image/');
+	$: isVideo = mimeType.startsWith('video/');
+	$: isSlides = primaryPart?.kind === 'text' && artMeta?.slides;
+
+	$: fileUri = primaryPart?.file?.uri || '';
+	$: proxyUrl = fileUri ? `/api/brain-proxy/${fileUri.replace(/^\/api\/v1\//, '')}` : '';
+
+	function extractFilePath(uri: string): string {
 		const prefix = '/api/brain-proxy/workspace/files/';
-		const idx = url.indexOf(prefix);
-		if (idx >= 0) return url.slice(idx + prefix.length);
-		return url.replace(/^.*\/workspace\/files\//, '');
+		const idx = uri.indexOf(prefix);
+		if (idx >= 0) return uri.slice(idx + prefix.length);
+		const wfIdx = uri.indexOf('/workspace/files/');
+		if (wfIdx >= 0) return uri.slice(wfIdx + '/workspace/files/'.length);
+		return uri.replace(/^.*\/workspace\/files\//, '');
 	}
 </script>
 
 <div class="artifact-viewer h-full">
-	{#if isUrlArtifact}
-		<!-- URL-based artifact: route by mime_type or artifact_type -->
-		{#if urlIsOffice}
-			<OnlyOfficeViewer
-				filePath={officeFilePath}
-				title={artifact.title || ''}
-			/>
-		{:else if urlIsImage}
-			<ImageViewer 
-				content={artifact.content}
-				title={artifact.title}
-				format="url"
-			/>
-		{:else if urlIsVideo}
-			<WebsiteViewer
-				content={artifact.content}
-				title={artifact.title}
-				format="url"
-			/>
-		{:else if artifact.type === 'spreadsheet'}
-			<WebsiteViewer
-				content={artifact.content}
-				title={artifact.title}
-				format="url"
-			/>
-		{:else if artifact.type === 'slides'}
-			<WebsiteViewer
-				content={artifact.content}
-				title={artifact.title}
-				format="url"
-			/>
-		{:else}
-			<WebsiteViewer
-				content={artifact.content}
-				title={artifact.title}
-				format="url"
-			/>
-		{/if}
-	{:else if artifact.type === 'document'}
-		<DocumentViewer 
-			content={artifact.content}
-			title={artifact.title}
-			format={format === 'markdown' ? 'markdown' : 'html'}
+	{#if isOffice && fileUri}
+		<OnlyOfficeViewer
+			filePath={extractFilePath(proxyUrl || fileUri)}
+			title={artifact.name || ''}
 		/>
-	{:else if artifact.type === 'slides'}
-		<SlidesViewer 
-			content={artifact.content}
-			title={artifact.title}
+	{:else if isImage && fileUri}
+		<ImageViewer
+			content={proxyUrl || fileUri}
+			title={artifact.name}
+			format="url"
 		/>
-	{:else if artifact.type === 'spreadsheet'}
-		<SpreadsheetViewer 
-			content={artifact.content}
-			title={artifact.title}
-			format={format === 'csv' ? 'csv' : 'json'}
-			columns={metadata.columns || []}
+	{:else if isVideo && fileUri}
+		<WebsiteViewer
+			content={proxyUrl || fileUri}
+			title={artifact.name}
+			format="url"
 		/>
-	{:else if artifact.type === 'terminal'}
-		<TerminalViewer 
-			content={artifact.content}
-			title={artifact.title}
-			command={metadata.command || ''}
-			exitCode={metadata.exitCode ?? null}
-			cwd={metadata.cwd || ''}
+	{:else if isSlides && primaryPart?.text}
+		<SlidesViewer
+			content={primaryPart.text}
+			title={artifact.name}
 		/>
-	{:else if artifact.type === 'files'}
-		<FilesViewer 
-			content={artifact.content}
-			title={artifact.title}
-			basePath={metadata.basePath || ''}
+	{:else if primaryPart?.kind === 'text' && primaryPart?.text}
+		<DocumentViewer
+			content={primaryPart.text}
+			title={artifact.name}
+			format="html"
 		/>
-	{:else if artifact.type === 'website'}
-		<WebsiteViewer 
-			content={artifact.content}
-			title={artifact.title}
-			format={format === 'url' ? 'url' : 'html'}
+	{:else if primaryPart?.kind === 'file' && fileUri}
+		<WebsiteViewer
+			content={proxyUrl || fileUri}
+			title={artifact.name}
+			format="url"
 		/>
-	{:else if artifact.type === 'image'}
-		<ImageViewer 
-			content={artifact.content}
-			title={artifact.title}
-			format={format === 'base64' ? 'base64' : format === 'gallery' ? 'gallery' : 'url'}
+	{:else if primaryPart?.kind === 'data'}
+		<DocumentViewer
+			content={JSON.stringify(primaryPart.data, null, 2)}
+			title={artifact.name}
+			format="html"
 		/>
 	{:else}
-		<DocumentViewer 
-			content={artifact.content}
-			title={artifact.title}
+		<DocumentViewer
+			content="No content available"
+			title={artifact.name}
 			format="html"
 		/>
 	{/if}
