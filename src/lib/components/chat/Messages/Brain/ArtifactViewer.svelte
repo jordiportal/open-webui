@@ -22,7 +22,19 @@
 	$: isSlides = primaryPart?.kind === 'text' && artMeta?.slides;
 
 	$: fileUri = primaryPart?.file?.uri || '';
-	$: proxyUrl = fileUri ? `/api/brain-proxy/${fileUri.replace(/^\/api\/v1\//, '')}` : '';
+	$: proxyUrl = (() => {
+		if (!fileUri) return '';
+		if (fileUri.startsWith('/api/brain-proxy/')) return fileUri;
+		const stripped = fileUri.replace(/^\/+/, '');
+		if (stripped.startsWith('api/brain-proxy/')) return `/${stripped}`;
+		if (stripped.startsWith('workspace/')) {
+			return `/api/brain-proxy/workspace/files/${stripped.replace(/^workspace\//, '')}`;
+		}
+		if (stripped.startsWith('api/v1/')) {
+			return `/api/brain-proxy/${stripped.replace(/^api\/v1\//, '')}`;
+		}
+		return `/api/brain-proxy/${stripped}`;
+	})();
 
 	function extractFilePath(uri: string): string {
 		const prefix = '/api/brain-proxy/workspace/files/';

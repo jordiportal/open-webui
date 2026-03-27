@@ -154,6 +154,8 @@ async def get_headers_and_cookies(
     if auth_type == "bearer" or auth_type is None:
         # Default to bearer if not specified
         token = f"{key}"
+        if key and key.startswith("sk-brain") and user:
+            headers["X-Brain-User-Email"] = getattr(user, "email", "") or ""
     elif auth_type == "none":
         token = None
     elif auth_type == "session":

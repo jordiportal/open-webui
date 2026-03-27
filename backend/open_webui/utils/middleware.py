@@ -3676,7 +3676,6 @@ async def streaming_chat_response_handler(response, ctx):
                             delta_count = 0
                             last_delta_data = None
 
-                    _pending_sse_event_name = None
                     async for line in response.body_iterator:
                         line = (
                             line.decode("utf-8", "replace")
@@ -3687,31 +3686,7 @@ async def streaming_chat_response_handler(response, ctx):
 
                         # Skip empty lines
                         if not data.strip():
-                            _pending_sse_event_name = None
                             continue
-
-                        # Capture SSE named event lines (e.g. "event: brain.artifact")
-                        if data.startswith("event:"):
-                            _pending_sse_event_name = data[len("event:"):].strip()
-                            continue
-
-                        # Handle SSE named events — forward as WebSocket messages
-                        if _pending_sse_event_name and data.startswith("data:"):
-                            _evt_data_str = data[len("data:"):].strip()
-                            try:
-                                _evt_payload = json.loads(_evt_data_str)
-                                await event_emitter(
-                                    {
-                                        "type": f"chat:{_pending_sse_event_name}",
-                                        "data": _evt_payload,
-                                    }
-                                )
-                            except Exception:
-                                pass
-                            _pending_sse_event_name = None
-                            continue
-
-                        _pending_sse_event_name = None
 
                         # "data:" is the prefix for each event
                         if not data.startswith("data:"):
