@@ -24,6 +24,9 @@
 	$: fileUri = primaryPart?.file?.uri || '';
 	$: proxyUrl = (() => {
 		if (!fileUri) return '';
+		if (fileUri.startsWith('sandbox://') && artifact.artifact_id) {
+			return `/api/brain-proxy/artifacts/${artifact.artifact_id}/content`;
+		}
 		if (fileUri.startsWith('/api/brain-proxy/')) return fileUri;
 		const stripped = fileUri.replace(/^\/+/, '');
 		if (stripped.startsWith('api/brain-proxy/')) return `/${stripped}`;
